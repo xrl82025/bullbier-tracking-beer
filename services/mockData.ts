@@ -17,6 +17,19 @@ class DatabaseStorage {
     }
   }
 
+  private getCurrentUserName(): string {
+    const sessionStr = localStorage.getItem('bt_session');
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr);
+        return session.name || 'Sistema';
+      } catch (e) {
+        return 'Sistema';
+      }
+    }
+    return 'Sistema';
+  }
+
   private setupRealtime() {
     try {
       supabase
@@ -167,7 +180,7 @@ class DatabaseStorage {
       await supabase.from('activities').insert([{
         barrel_id: data[0].id,
         barrel_code: data[0].code,
-        user_name: 'Juan Doe',
+        user_name: this.getCurrentUserName(),
         new_status: data[0].status,
         location_id: data[0].last_location_id,
         location_name: data[0].last_location_name,
@@ -226,7 +239,7 @@ class DatabaseStorage {
       await supabase.from('activities').insert([{
         barrel_id: barrelId,
         barrel_code: barrel.code,
-        user_name: 'Juan Doe',
+        user_name: this.getCurrentUserName(),
         previous_status: previousStatus,
         new_status: finalStatus,
         location_id: updateData.last_location_id || barrel.lastLocationId,

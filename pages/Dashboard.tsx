@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLocation } from 'wouter';
 import { 
@@ -20,11 +19,18 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { storage } from '../services/mockData';
+// Fixed: UserSession is exported from authService, not types
 import { BarrelStatus } from '../types';
+import { UserSession } from '../services/authService';
 import StatusBadge from '../components/StatusBadge';
 import { STATUS_LABELS } from '../constants';
 
-const Dashboard: React.FC = () => {
+// Fixed: Used UserSession interface instead of inline object type
+interface DashboardProps {
+  user: UserSession;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [, setLocation] = useLocation();
   const barrels = storage.getBarrels();
   const activities = storage.getActivities().slice(0, 6);
@@ -48,7 +54,7 @@ const Dashboard: React.FC = () => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-normal text-slate-900 dark:text-white tracking-tight">
-            Hola, <span className="gemini-gradient font-semibold">Juan</span>
+            Hola, <span className="gemini-gradient font-semibold">{user.name}</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Aquí tienes un resumen de la operación cervecera.</p>
         </div>
@@ -66,7 +72,6 @@ const Dashboard: React.FC = () => {
         {stats.map((stat, i) => (
           <div key={i} className="gemini-card p-6 rounded-3xl dark:bg-slate-800 dark:border-slate-700">
             <div className={`${stat.color} mb-4`}>
-              {/* Fixed: Added <any> to React.ReactElement to resolve className property error */}
               {React.cloneElement(stat.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
             </div>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
@@ -101,7 +106,7 @@ const Dashboard: React.FC = () => {
                     border: 'none', 
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                     backgroundColor: isDark ? '#1e293b' : '#FFFFFF',
-                    color: isDark ? '#f1f5f9' : '#1f2937'
+                    color: isDark ? '#1f2937' : '#1f2937'
                   }}
                   itemStyle={{ color: isDark ? '#f1f5f9' : '#1f2937' }}
                 />

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Route, Switch, Router, useLocation } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import Sidebar from './components/Sidebar';
@@ -15,8 +15,10 @@ import Recipes from './pages/Recipes';
 import Events from './pages/Events';
 import AIAgent from './pages/AIAgent';
 import AIChatWidget from './components/AIChatWidget';
+import Login from './pages/Login';
+import { authService, UserSession } from './services/authService';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout: React.FC<{ children: React.ReactNode; user: UserSession; onLogout: () => void }> = ({ children, user, onLogout }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [location] = useLocation();
 
@@ -24,7 +26,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="flex bg-[#f8fafc] dark:bg-slate-950 min-h-screen transition-colors duration-300 overflow-x-hidden">
-      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} user={user} onLogout={onLogout} />
       <div className="flex-1 flex flex-col min-h-screen relative w-full overflow-x-hidden">
         <Header isCollapsed={isCollapsed} />
         <main 
@@ -45,11 +47,46 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<UserSession | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    const currentSession = authService.getCurrentSession();
+    setSession(currentSession);
+    setIsInitializing(false);
+  }, []);
+
+  const handleLoginSuccess = () => {
+    setSession(authService.getCurrentSession());
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setSession(null);
+  };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cargando Sistema...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <Router hook={useHashLocation}>
-      <Layout>
+      <Layout user={session} onLogout={handleLogout}>
         <Switch>
-          <Route path="/" component={Dashboard} />
+          <Route path="/">
+            <Dashboard user={session} />
+          </Route>
           <Route path="/barrels" component={Barrels} />
           <Route path="/barrels/:id" component={BarrelDetail} />
           <Route path="/scan" component={ScanQR} />

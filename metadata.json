@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Barriles-tracking",
+  "description": "",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

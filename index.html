@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BarrelTrack - Brewery Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Polyfill mínimo para evitar errores de referencia en el navegador
+      window.process = window.process || { env: {} };
+
+      // Initial theme check
+      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#1A73E8', // Blue Google
+                dark: '#1557B0',
+                light: '#E8F0FE',
+              },
+              gemini: {
+                blue: '#4285F4',
+                purple: '#9333EA',
+                pink: '#DB2777',
+                bg: '#F8FAFD',
+              },
+              secondary: {
+                DEFAULT: '#1F1F1F',
+                foreground: '#FFFFFF',
+              }
+            },
+            borderRadius: {
+              '2xl': '1rem',
+              '3xl': '1.5rem',
+              '4xl': '2rem',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #F8FAFD;
+        color: #1F1F1F;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      
+      .dark body {
+        background-color: #020617; /* slate-950 */
+        color: #f1f5f9; /* slate-100 */
+      }
+
+      .gemini-gradient {
+        background: linear-gradient(90deg, #4285F4 0%, #9333EA 50%, #DB2777 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .gemini-card {
+        background: #FFFFFF;
+        border: 1px solid #E3E3E3;
+        transition: all 0.2s ease;
+      }
+
+      .dark .gemini-card {
+        background: #1e293b; /* slate-800 */
+        border-color: #334155; /* slate-700 */
+      }
+
+      .gemini-card:hover {
+        border-color: #D2D2D2;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      
+      .dark .gemini-card:hover {
+        border-color: #475569;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      }
+
+      .sidebar-item-active {
+        background-color: #E8F0FE;
+        color: #1A73E8;
+      }
+      
+      .dark .sidebar-item-active {
+        background-color: rgba(26, 115, 232, 0.1);
+        color: #60a5fa;
+      }
+
+      /* Pill style buttons */
+      .btn-pill {
+        border-radius: 9999px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-gemini {
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+
+      @keyframes scanLine {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(280px); }
+        100% { transform: translateY(0); }
+      }
+      .scan-line {
+        animation: scanLine 2s infinite linear;
+      }
+
+      /* Custom scrollbar for dark mode */
+      .dark ::-webkit-scrollbar {
+        width: 8px;
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #0f172a;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 10px;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #475569;
+      }
+
+      /* Custom styles for select and date inputs in dark mode */
+      .dark select, .dark input[type="date"] {
+        color-scheme: dark;
+      }
+
+      /* Animación personalizada para el gradiente de texto con rose-500 */
+      .text-gradient-animate {
+        background-size: 200% auto;
+        animation: shine 3s linear infinite;
+      }
+      @keyframes shine {
+        to {
+          background-position: 200% center;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.475.0?external=react",
+    "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
+    "wouter": "https://esm.sh/wouter@3.6.0?external=react,react-dom",
+    "wouter/use-hash-location": "https://esm.sh/wouter@3.6.0/use-hash-location?external=react,react-dom",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "wouter/": "https://esm.sh/wouter@^3.9.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

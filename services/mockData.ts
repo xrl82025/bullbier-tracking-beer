@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { Barrel, BarrelStatus, BeerType, Location, Activity, Recipe, BreweryEvent, Notification } from '../types';
 
@@ -35,7 +36,7 @@ class DatabaseStorage {
       supabase
         .channel('schema-db-changes')
         .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-          this.notify();
+          this.refreshAll();
         })
         .subscribe();
     } catch (e) {
@@ -55,10 +56,7 @@ class DatabaseStorage {
   }
 
   async refreshAll() {
-    if (!supabase) {
-      console.warn("No Supabase client available. Skipping refresh.");
-      return;
-    }
+    if (!supabase) return;
 
     try {
       const [b, l, a, n, r, e] = await Promise.all([
@@ -122,7 +120,7 @@ class DatabaseStorage {
       
       this.notify();
     } catch (error) {
-      console.error("Error refreshing data from Supabase:", error);
+      console.error("Error refreshing data:", error);
     }
   }
 
@@ -150,24 +148,27 @@ class DatabaseStorage {
       type: notification.type || 'info',
       read: false
     }]);
-    this.refreshAll();
+    await this.refreshAll();
   }
 
+  // Mark a specific notification as read in the database
   async markNotificationAsRead(id: string) {
     if (!supabase) return;
     await supabase.from('notifications').update({ read: true }).eq('id', id);
-    this.refreshAll();
+    await this.refreshAll();
   }
 
+  // Remove all notifications from the database
   async clearNotifications() {
     if (!supabase) return;
+    // Supabase delete requires a filter; we use a filter that matches all UUIDs
     await supabase.from('notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    this.refreshAll();
+    await this.refreshAll();
   }
 
   async addBarrel(barrelData: Partial<Barrel>) {
     if (!supabase) return;
-    const { data } = await supabase.from('barrels').insert([{
+    const { data, error } = await supabase.from('barrels').insert([{
       code: barrelData.code,
       capacity: barrelData.capacity || 50,
       beer_type: barrelData.beerType,
@@ -187,27 +188,33 @@ class DatabaseStorage {
         beer_type: data[0].beer_type
       }]);
     }
-    this.refreshAll();
+    await this.refreshAll();
   }
 
   async addLocation(name: string, address: string) {
     if (!supabase) return;
-    await supabase.from('locations').insert([{ name, address }]);
-    this.refreshAll();
+    // Agregamos lat/lng por defecto para evitar errores si la DB lo requiere
+    await supabase.from('locations').insert([{ 
+      name, 
+      address, 
+      lat: '-34.6037', 
+      lng: '-58.3816' 
+    }]);
+    await this.refreshAll();
   }
 
   async updateLocation(id: string, updates: Partial<Location>) {
     if (!supabase) return;
     await supabase.from('locations').update(updates).eq('id', id);
-    this.refreshAll();
+    await this.refreshAll();
   }
 
   async deleteLocation(id: string) {
-    if (!supabase) return { success: false, error: 'No database connection' };
+    if (!supabase) return { success: false, error: 'Sin conexión' };
     const hasBarrels = this.barrelsCache.some(b => b.lastLocationId === id);
-    if (hasBarrels) return { success: false, error: 'Ubicación con barriles asignados.' };
+    if (hasBarrels) return { success: false, error: 'Ubicación con barriles.' };
     await supabase.from('locations').delete().eq('id', id);
-    this.refreshAll();
+    await this.refreshAll();
     return { success: true };
   }
 
@@ -250,22 +257,7 @@ class DatabaseStorage {
     }
     
     await this.refreshAll();
-
-    if (updatedBarrel && updatedBarrel[0]) {
-      const item = updatedBarrel[0];
-      return {
-        id: item.id,
-        code: item.code,
-        capacity: item.capacity,
-        beerType: item.beer_type,
-        status: item.status,
-        lastLocationId: item.last_location_id,
-        lastLocationName: item.last_location_name,
-        lastUpdate: item.last_update,
-        createdAt: item.created_at
-      };
-    }
-    return null;
+    return updatedBarrel ? updatedBarrel[0] : null;
   }
 
   async addRecipe(recipe: Partial<Recipe>) {
@@ -276,7 +268,7 @@ class DatabaseStorage {
       ingredients: recipe.ingredients,
       steps: recipe.steps
     }]);
-    this.refreshAll();
+    await this.refreshAll();
   }
 
   async addEvent(eventData: Partial<BreweryEvent>) {
@@ -288,7 +280,7 @@ class DatabaseStorage {
       barrel_ids: eventData.barrelIds,
       checklist: eventData.checklist
     }]);
-    this.refreshAll();
+    await this.refreshAll();
   }
 
   async updateEvent(id: string, updates: Partial<BreweryEvent>) {
@@ -301,10 +293,19 @@ class DatabaseStorage {
     if (updates.checklist !== undefined) updatePayload.checklist = updates.checklist;
 
     await supabase.from('events').update(updatePayload).eq('id', id);
-    this.refreshAll();
+    await this.refreshAll();
   }
 }
 
 export const storage = new DatabaseStorage();
-// Inicialización diferida para no bloquear el hilo principal de importación
+
+// Hook personalizado para usar en componentes
+export const useStorage = () => {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    return storage.subscribe(() => setTick(t => t + 1));
+  }, []);
+  return storage;
+};
+
 setTimeout(() => storage.refreshAll(), 0);

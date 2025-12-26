@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
-import { storage } from '../services/mockData';
-import { BeerType, BarrelStatus, Location } from '../types';
+import { useStorage } from '../services/mockData';
+import { BeerType, BarrelStatus } from '../types';
 import StatusBadge from '../components/StatusBadge';
-import { Search, Filter, Plus, ChevronRight, X, MoreHorizontal, Package } from 'lucide-react';
+import { Search, Plus, ChevronRight, X } from 'lucide-react';
 import { Link } from 'wouter';
 
 const Barrels: React.FC = () => {
@@ -12,19 +12,20 @@ const Barrels: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   
+  const storage = useStorage();
+  const locations = storage.getLocations();
+
   const [newBarrel, setNewBarrel] = useState({
     code: '',
     capacity: 50,
     beerType: BeerType.GOLDEN_ALE,
-    locationId: 'loc-1'
+    locationId: locations[0]?.id || ''
   });
 
-  const locations = storage.getLocations();
-
-  const handleAddBarrel = (e: React.FormEvent) => {
+  const handleAddBarrel = async (e: React.FormEvent) => {
     e.preventDefault();
     const loc = locations.find(l => l.id === newBarrel.locationId);
-    storage.addBarrel({
+    await storage.addBarrel({
       code: newBarrel.code,
       capacity: newBarrel.capacity,
       beerType: newBarrel.beerType,
@@ -32,7 +33,7 @@ const Barrels: React.FC = () => {
       lastLocationName: loc?.name || 'Bodega Principal'
     });
     setShowAddModal(false);
-    setNewBarrel({ code: '', capacity: 50, beerType: BeerType.GOLDEN_ALE, locationId: 'loc-1' });
+    setNewBarrel({ code: '', capacity: 50, beerType: BeerType.GOLDEN_ALE, locationId: locations[0]?.id || '' });
   };
 
   const barrels = storage.getBarrels().filter(b => {
@@ -71,8 +72,6 @@ const Barrels: React.FC = () => {
             />
           </div>
           
-          <div className="hidden md:block h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2" />
-
           <div className="flex flex-col sm:flex-row items-center gap-2 px-1">
             <select 
               className="w-full sm:w-auto px-6 py-2.5 bg-slate-50 dark:bg-slate-900 border-none rounded-xl md:rounded-full text-[11px] font-bold text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer appearance-none"
@@ -98,11 +97,10 @@ const Barrels: React.FC = () => {
           </div>
         </div>
 
-        {/* Vista Mobile: Cards */}
-        <div className="md:hidden space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {barrels.map((barrel) => (
             <Link key={barrel.id} href={`/barrels/${barrel.id}`}>
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm active:scale-[0.98] transition-all">
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm active:scale-[0.98] transition-all cursor-pointer">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary font-black text-sm">
@@ -128,66 +126,7 @@ const Barrels: React.FC = () => {
             </Link>
           ))}
           {barrels.length === 0 && (
-            <div className="py-12 text-center text-slate-400 italic text-sm">No se encontraron barriles</div>
-          )}
-        </div>
-
-        {/* Vista Escritorio: Tabla */}
-        <div className="hidden md:block bg-white dark:bg-slate-800 rounded-4xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-700">
-          <table className="w-full text-left border-collapse">
-            <thead className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-900/50">
-              <tr>
-                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Activo</th>
-                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Variedad</th>
-                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
-                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ubicación</th>
-                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-              {barrels.map((barrel) => (
-                <tr key={barrel.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-primary font-bold text-sm">
-                        {barrel.code.slice(-2)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{barrel.code}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{barrel.capacity} Litros</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      {barrel.status === BarrelStatus.EN_BODEGA_LIMPIO ? '—' : barrel.beerType}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <StatusBadge status={barrel.status} />
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary/40" />
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{barrel.lastLocationName}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link href={`/barrels/${barrel.id}`}>
-                        <button className="px-4 py-2 text-primary font-bold text-xs hover:bg-primary-light dark:hover:bg-primary/10 rounded-full transition-all flex items-center gap-1">
-                          Detalles
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {barrels.length === 0 && (
-            <div className="py-20 text-center text-slate-400 italic">No se encontraron barriles</div>
+            <div className="col-span-full py-12 text-center text-slate-400 italic text-sm">No se encontraron barriles</div>
           )}
         </div>
       </div>
@@ -215,7 +154,7 @@ const Barrels: React.FC = () => {
                   required
                   type="text" 
                   placeholder="BRL-000"
-                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/10 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
                   value={newBarrel.code}
                   onChange={(e) => setNewBarrel({...newBarrel, code: e.target.value.toUpperCase()})}
                 />
@@ -227,7 +166,7 @@ const Barrels: React.FC = () => {
                   <input 
                     required
                     type="number" 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/10 outline-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     value={newBarrel.capacity}
                     onChange={(e) => setNewBarrel({...newBarrel, capacity: parseInt(e.target.value)})}
                   />
@@ -235,7 +174,7 @@ const Barrels: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">VARIEDAD</label>
                   <select 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/10 outline-none transition-all appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
                     value={newBarrel.beerType}
                     onChange={(e) => setNewBarrel({...newBarrel, beerType: e.target.value as BeerType})}
                   >
@@ -247,7 +186,7 @@ const Barrels: React.FC = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">UBICACIÓN INICIAL</label>
                 <select 
-                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/10 outline-none transition-all appearance-none cursor-pointer"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
                   value={newBarrel.locationId}
                   onChange={(e) => setNewBarrel({...newBarrel, locationId: e.target.value})}
                 >

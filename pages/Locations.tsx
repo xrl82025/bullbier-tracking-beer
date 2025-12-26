@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { storage } from '../services/mockData';
+import { useStorage } from '../services/mockData';
 import { MapPin, Navigation, MoreVertical, Plus, X, Edit2, Trash2, ExternalLink, AlertCircle } from 'lucide-react';
 import { Location } from '../types';
 
@@ -12,8 +12,8 @@ const Locations: React.FC = () => {
   const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const storage = useStorage();
   const menuRef = useRef<HTMLDivElement>(null);
-
   const locations = storage.getLocations();
 
   useEffect(() => {
@@ -26,23 +26,22 @@ const Locations: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    storage.addLocation(name, address);
+    await storage.addLocation(name, address);
     setShowAddModal(false);
     resetForm();
   };
 
-  const handleEdit = (e: React.FormEvent) => {
+  const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingLocation) {
-      storage.updateLocation(editingLocation.id, { name, address });
+      await storage.updateLocation(editingLocation.id, { name, address });
       setEditingLocation(null);
       resetForm();
     }
   };
 
-  // Fix: handle async call to deleteLocation
   const handleDelete = async (id: string) => {
     const result = await storage.deleteLocation(id);
     if (!result.success) {

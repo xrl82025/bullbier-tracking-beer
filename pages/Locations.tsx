@@ -42,8 +42,9 @@ const Locations: React.FC = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
-    const result = storage.deleteLocation(id);
+  // Fix: handle async call to deleteLocation
+  const handleDelete = async (id: string) => {
+    const result = await storage.deleteLocation(id);
     if (!result.success) {
       setError(result.error || 'Error al eliminar');
       setTimeout(() => setError(null), 3000);

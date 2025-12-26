@@ -50,7 +50,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed }) => {
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
-                  {React.cloneElement(item.icon as React.ReactElement, { 
+                  {/* Fixed: Added <any> to React.ReactElement to resolve className property error */}
+                  {React.cloneElement(item.icon as React.ReactElement<any>, { 
                     className: `w-5 h-5 shrink-0 ${isActive ? 'text-primary' : 'text-slate-500'}` 
                   })}
                   {!isCollapsed && <span className="truncate animate-in fade-in duration-300">{item.label}</span>}
@@ -109,7 +110,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed }) => {
               <Link key={item.path} href={item.path}>
                 <a className={`flex flex-col items-center justify-center min-w-[72px] px-2 py-1 rounded-2xl transition-all ${isActive ? 'text-primary' : 'text-slate-400'}`}>
                   <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-primary-light dark:bg-primary/10' : 'bg-transparent'}`}>
-                    {React.cloneElement(item.icon as React.ReactElement, { 
+                    {/* Fixed: Added <any> to React.ReactElement to resolve className property error */}
+                    {React.cloneElement(item.icon as React.ReactElement<any>, { 
                       className: `w-6 h-6 ${isActive ? 'text-primary' : 'text-slate-400'}` 
                     })}
                   </div>

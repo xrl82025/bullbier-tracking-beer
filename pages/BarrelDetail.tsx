@@ -96,8 +96,9 @@ const BarrelDetail: React.FC = () => {
 
   if (!barrel) return <div className="p-8 text-center text-slate-500">Cargando barril...</div>;
 
-  const handleUpdateStatus = () => {
-    const updated = storage.updateBarrelStatus(barrel.id, (selectedStatus as BarrelStatus) || undefined, {
+  // Fixed: Made handleUpdateStatus async and added await for storage.updateBarrelStatus
+  const handleUpdateStatus = async () => {
+    const updated = await storage.updateBarrelStatus(barrel.id, (selectedStatus as BarrelStatus) || undefined, {
       locationId: selectedLocationId,
       beerType: selectedBeerType as BeerType || undefined,
       eventId: selectedEventId || undefined,
@@ -105,7 +106,15 @@ const BarrelDetail: React.FC = () => {
     });
 
     if (updated) {
-      setBarrel({ ...updated });
+      // Since refreshAll is called inside updateBarrelStatus, we should use the updated object from cache
+      // to ensure correct mapping from camelCase/snakeCase if applicable
+      const freshBarrel = storage.getBarrel(barrel.id);
+      if (freshBarrel) {
+        setBarrel({ ...freshBarrel });
+      } else {
+        // Fallback to updated record if not found in cache for some reason
+        setBarrel({ ...updated });
+      }
       setActivities([...storage.getActivities().filter(a => a.barrelId === barrel.id)]);
       setEvents([...storage.getEvents()]);
       setShowStatusModal(false);
@@ -348,7 +357,7 @@ const BarrelDetail: React.FC = () => {
 
       {showStatusModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20 dark:bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] border border-slate-100 dark:border-slate-700 mx-4">
+          <div className="bg-white dark:bg-slate-800 w-full max-md rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] border border-slate-100 dark:border-slate-700 mx-4">
             <div className="px-8 pt-8 pb-4 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 shrink-0 relative">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Gestionar Barril</h2>
@@ -359,7 +368,7 @@ const BarrelDetail: React.FC = () => {
               </button>
             </div>
             
-            <div className="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="px-8 py-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar shrink-0">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">ESTADO OPERATIVO</label>
                 <select 

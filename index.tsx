@@ -2,10 +2,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { storage } from './services/mockData';
 
-// Polyfill process for browser environment to avoid "ReferenceError: process is not defined"
-// Only define it if it's missing to avoid overwriting environment-injected values.
-// Removed manual definition of API_KEY as per GenAI guidelines.
+// Asegurar carga inicial de datos desde Supabase
+storage.refreshAll();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

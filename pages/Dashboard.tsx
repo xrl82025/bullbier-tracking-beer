@@ -66,7 +66,8 @@ const Dashboard: React.FC = () => {
         {stats.map((stat, i) => (
           <div key={i} className="gemini-card p-6 rounded-3xl dark:bg-slate-800 dark:border-slate-700">
             <div className={`${stat.color} mb-4`}>
-              {React.cloneElement(stat.icon as React.ReactElement, { className: 'w-6 h-6' })}
+              {/* Fixed: Added <any> to React.ReactElement to resolve className property error */}
+              {React.cloneElement(stat.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
             </div>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
             <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stat.value}</p>

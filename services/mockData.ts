@@ -1,96 +1,21 @@
 
-import { Barrel, BarrelStatus, BeerType, Location, Activity, User, UserRole, Comment, Recipe, BreweryEvent, Notification } from '../types';
+import { supabase } from './supabaseClient';
+import { Barrel, BarrelStatus, BeerType, Location, Activity, Recipe, BreweryEvent, Notification } from '../types';
 
-const INITIAL_LOCATIONS: Location[] = [
-  { id: 'loc-1', name: 'Bodega Principal', address: 'Calle Falsa 123', lat: '-33.4489', lng: '-70.6693' },
-  { id: 'loc-2', name: 'Depósito Sur', address: 'Av. Siempre Viva 742', lat: '-33.4569', lng: '-70.6483' },
-  { id: 'loc-3', name: 'Bar Centro', address: 'Plaza Italia s/n', lat: '-33.4372', lng: '-70.6341' },
-];
-
-const INITIAL_BARRELS: Barrel[] = [
-  { 
-    id: 'b-1', code: 'BRL-001', capacity: 50, beerType: BeerType.GOLDEN_ALE, 
-    status: BarrelStatus.EN_BODEGA_LIMPIO, lastLocationId: 'loc-1', lastLocationName: 'Bodega Principal',
-    lastUpdate: new Date().toISOString(), createdAt: new Date().toISOString()
-  },
-  { 
-    id: 'b-2', code: 'BRL-002', capacity: 50, beerType: BeerType.STOUT, 
-    status: BarrelStatus.LLENADO, lastLocationId: 'loc-1', lastLocationName: 'Bodega Principal',
-    lastUpdate: new Date().toISOString(), createdAt: new Date().toISOString()
-  },
-  { 
-    id: 'b-3', code: 'BRL-003', capacity: 30, beerType: BeerType.CALAFATE, 
-    status: BarrelStatus.EN_TRANSITO, lastLocationId: 'loc-3', lastLocationName: 'Bar Centro',
-    lastUpdate: new Date().toISOString(), createdAt: new Date().toISOString()
-  }
-];
-
-const INITIAL_RECIPES: Recipe[] = [
-  { 
-    id: 'r-1', 
-    name: 'Golden Ale Clásica', 
-    description: 'Refrescante y ligera con notas cítricas.', 
-    ingredients: [
-      {name: 'Malta Pale', quantity: '5', unit: 'kg'}, 
-      {name: 'Lúpulo Cascade', quantity: '30', unit: 'g'}
-    ],
-    steps: [
-      { title: "Maceración", description: "Infusión simple a 68°C durante 60 minutos para extracción de azúcares." },
-      { title: "Hervor", description: "Hervido vigoroso de 60 min con adiciones de lúpulo según cronograma." },
-      { title: "Fermentación", description: "Mantener a 19°C constantes durante 7 días." }
-    ]
-  },
-];
-
-const INITIAL_EVENTS: BreweryEvent[] = [
-  { id: 'e-1', name: 'Festival Cerveza Invierno', date: '2024-07-15', notes: 'Evento principal en plaza central', barrelIds: ['b-1', 'b-3'], checklist: [{id: 'c1', name: 'Hielo', checked: true}, {id: 'c2', name: 'Vasos', checked: false}] },
-];
-
-class MockStorage {
-  private barrels: Barrel[] = [];
-  private locations: Location[] = [];
-  private activities: Activity[] = [];
-  private comments: Comment[] = [];
-  private recipes: Recipe[] = [];
-  private events: BreweryEvent[] = [];
-  private notifications: Notification[] = [];
+class DatabaseStorage {
   private listeners: (() => void)[] = [];
 
   constructor() {
-    this.load();
+    this.setupRealtime();
   }
 
-  private load() {
-    const savedBarrels = localStorage.getItem('bt_barrels');
-    const savedLocations = localStorage.getItem('bt_locations');
-    const savedActivities = localStorage.getItem('bt_activities');
-    const savedComments = localStorage.getItem('bt_comments');
-    const savedRecipes = localStorage.getItem('bt_recipes');
-    const savedEvents = localStorage.getItem('bt_events');
-    const savedNotifications = localStorage.getItem('bt_notifications');
-
-    this.barrels = savedBarrels ? JSON.parse(savedBarrels) : INITIAL_BARRELS;
-    this.locations = savedLocations ? JSON.parse(savedLocations) : INITIAL_LOCATIONS;
-    this.activities = savedActivities ? JSON.parse(savedActivities) : [];
-    this.comments = savedComments ? JSON.parse(savedComments) : [];
-    this.recipes = savedRecipes ? JSON.parse(savedRecipes) : INITIAL_RECIPES;
-    this.events = savedEvents ? JSON.parse(savedEvents) : INITIAL_EVENTS;
-    this.notifications = savedNotifications ? JSON.parse(savedNotifications) : [
-      { id: 'n1', title: 'Bienvenido', message: 'BarrelTrack está listo para operar.', type: 'success', createdAt: new Date().toISOString(), read: false }
-    ];
-
-    if (!savedBarrels) this.save();
-  }
-
-  private save() {
-    localStorage.setItem('bt_barrels', JSON.stringify(this.barrels));
-    localStorage.setItem('bt_locations', JSON.stringify(this.locations));
-    localStorage.setItem('bt_activities', JSON.stringify(this.activities));
-    localStorage.setItem('bt_comments', JSON.stringify(this.comments));
-    localStorage.setItem('bt_recipes', JSON.stringify(this.recipes));
-    localStorage.setItem('bt_events', JSON.stringify(this.events));
-    localStorage.setItem('bt_notifications', JSON.stringify(this.notifications));
-    this.notify();
+  private setupRealtime() {
+    supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        this.notify();
+      })
+      .subscribe();
   }
 
   private notify() {
@@ -104,247 +29,277 @@ class MockStorage {
     };
   }
 
-  getBarrels() { return this.barrels; }
-  getBarrel(id: string) { return this.barrels.find(b => b.id === id); }
-  getLocations() { 
-    return this.locations.map(loc => ({
-      ...loc,
-      barrelCount: this.barrels.filter(b => b.lastLocationId === loc.id).length
+  // --- READ OPERATIONS (Asíncronas pero usadas síncronamente en componentes actuales con estados locales) ---
+  // Nota: En una app real de producción, usaríamos React Query o SWR. 
+  // Aquí mantendremos compatibilidad con los componentes actuales.
+
+  async fetchBarrels(): Promise<Barrel[]> {
+    const { data, error } = await supabase.from('barrels').select('*').order('created_at', { ascending: false });
+    if (error) console.error(error);
+    // Map to camelCase to match types.ts interfaces
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      capacity: item.capacity,
+      beerType: item.beer_type,
+      status: item.status,
+      lastLocationId: item.last_location_id,
+      lastLocationName: item.last_location_name,
+      lastUpdate: item.last_update,
+      createdAt: item.created_at
     }));
   }
-  getActivities() { return this.activities.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
-  getComments(barrelId: string) { return this.comments.filter(c => c.barrelId === barrelId); }
-  getRecipes() { return this.recipes; }
-  getEvents() { return this.events; }
-  getNotifications() { return this.notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 
-  addNotification(notification: Partial<Notification>) {
-    const newNotif: Notification = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: notification.title || 'Nueva Alerta',
-      message: notification.message || '',
-      type: notification.type || 'info',
-      createdAt: new Date().toISOString(),
-      read: false
-    };
-    this.notifications.unshift(newNotif);
-    if (this.notifications.length > 50) this.notifications.pop();
-    this.save();
-  }
+  // Métodos simplificados para que los componentes actuales funcionen
+  // En los componentes actuales, se llama a storage.getBarrels()
+  // Implementaremos una cache local para mantener la compatibilidad síncrona
+  private barrelsCache: Barrel[] = [];
+  private locationsCache: Location[] = [];
+  private activitiesCache: Activity[] = [];
+  private notificationsCache: Notification[] = [];
+  private recipesCache: Recipe[] = [];
+  private eventsCache: BreweryEvent[] = [];
 
-  markNotificationAsRead(id: string) {
-    const notif = this.notifications.find(n => n.id === id);
-    if (notif) {
-      notif.read = true;
-      this.save();
-    }
-  }
+  async refreshAll() {
+    const [b, l, a, n, r, e] = await Promise.all([
+      supabase.from('barrels').select('*').order('created_at', { ascending: false }),
+      supabase.from('locations').select('*').order('name'),
+      supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('recipes').select('*').order('name'),
+      supabase.from('events').select('*').order('date', { ascending: false })
+    ]);
 
-  clearNotifications() {
-    this.notifications = [];
-    this.save();
-  }
+    // Map to camelCase interfaces defined in types.ts
+    this.barrelsCache = (b.data || []).map((item: any) => ({
+      id: item.id,
+      code: item.code,
+      capacity: item.capacity,
+      beerType: item.beer_type,
+      status: item.status,
+      lastLocationId: item.last_location_id,
+      lastLocationName: item.last_location_name,
+      lastUpdate: item.last_update,
+      createdAt: item.created_at
+    }));
 
-  addBarrel(barrelData: Partial<Barrel>) {
-    const newBarrel: Barrel = {
-      id: Math.random().toString(36).substr(2, 9),
-      code: barrelData.code || `BRL-${(this.barrels.length + 1).toString().padStart(3, '0')}`,
-      capacity: barrelData.capacity || 50,
-      beerType: barrelData.beerType || BeerType.GOLDEN_ALE,
-      status: barrelData.status || BarrelStatus.EN_BODEGA_LIMPIO,
-      lastLocationId: barrelData.lastLocationId || 'loc-1',
-      lastLocationName: barrelData.lastLocationName || 'Bodega Principal',
-      lastUpdate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-    this.barrels.push(newBarrel);
+    this.locationsCache = l.data || [];
+
+    this.activitiesCache = (a.data || []).map((item: any) => ({
+      id: item.id,
+      barrelId: item.barrel_id,
+      barrelCode: item.barrel_code,
+      userId: item.user_id,
+      userName: item.user_name,
+      previousStatus: item.previous_status,
+      newStatus: item.new_status,
+      locationId: item.location_id,
+      locationName: item.location_name,
+      beerType: item.beer_type,
+      eventName: item.event_name,
+      notes: item.notes,
+      createdAt: item.created_at
+    }));
+
+    this.notificationsCache = (n.data || []).map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      message: item.message,
+      type: item.type,
+      createdAt: item.created_at,
+      read: item.read
+    }));
+
+    this.recipesCache = r.data || [];
+
+    this.eventsCache = (e.data || []).map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      date: item.date,
+      notes: item.notes,
+      barrelIds: item.barrel_ids || [],
+      checklist: item.checklist || []
+    }));
     
-    this.activities.push({
-      id: Math.random().toString(36).substr(2, 9),
-      barrelId: newBarrel.id,
-      barrelCode: newBarrel.code,
-      userId: 'user-1',
-      userName: 'Juan Doe',
-      previousStatus: null,
-      newStatus: newBarrel.status,
-      locationId: newBarrel.lastLocationId,
-      locationName: newBarrel.lastLocationName,
-      beerType: newBarrel.beerType,
-      createdAt: new Date().toISOString()
-    });
-
-    this.addNotification({
-      title: 'Nuevo Activo',
-      message: `El barril ${newBarrel.code} ha sido registrado exitosamente.`,
-      type: 'success'
-    });
-
-    this.save();
-    return newBarrel;
+    this.notify();
   }
 
-  addLocation(name: string, address: string) {
-    const newLoc: Location = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      address,
-      lat: '-33.44',
-      lng: '-70.66'
-    };
-    this.locations.push(newLoc);
-    this.save();
-    return newLoc;
+  getBarrels() { return this.barrelsCache; }
+  getBarrel(id: string) { return this.barrelsCache.find(b => b.id === id); }
+  getLocations() { 
+    return this.locationsCache.map(loc => ({
+      ...loc,
+      // Fix: Use camelCase property lastLocationId instead of snake_case last_location_id
+      barrelCount: this.barrelsCache.filter(b => b.lastLocationId === loc.id).length
+    }));
+  }
+  getActivities() { return this.activitiesCache; }
+  getComments(barrelId: string) { return []; /* Implementar tabla de comentarios si es necesario */ }
+  getRecipes() { return this.recipesCache; }
+  getEvents() { return this.eventsCache; }
+  getNotifications() { return this.notificationsCache; }
+
+  // --- WRITE OPERATIONS ---
+
+  async addNotification(notification: Partial<Notification>) {
+    await supabase.from('notifications').insert([{
+      title: notification.title,
+      message: notification.message,
+      type: notification.type || 'info',
+      read: false
+    }]);
+    this.refreshAll();
   }
 
-  updateLocation(id: string, updates: Partial<Location>) {
-    const index = this.locations.findIndex(l => l.id === id);
-    if (index !== -1) {
-      this.locations[index] = { ...this.locations[index], ...updates };
-      if (updates.name) {
-        this.barrels.forEach(b => {
-          if (b.lastLocationId === id) {
-            b.lastLocationName = updates.name!;
-          }
-        });
-      }
-      this.save();
-      return this.locations[index];
+  async markNotificationAsRead(id: string) {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    this.refreshAll();
+  }
+
+  async clearNotifications() {
+    await supabase.from('notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    this.refreshAll();
+  }
+
+  async addBarrel(barrelData: Partial<Barrel>) {
+    const { data, error } = await supabase.from('barrels').insert([{
+      code: barrelData.code,
+      capacity: barrelData.capacity || 50,
+      beer_type: barrelData.beerType,
+      status: barrelData.status || BarrelStatus.EN_BODEGA_LIMPIO,
+      last_location_id: barrelData.lastLocationId,
+      last_location_name: barrelData.lastLocationName
+    }]).select();
+
+    if (data && data[0]) {
+      await supabase.from('activities').insert([{
+        barrel_id: data[0].id,
+        barrel_code: data[0].code,
+        user_name: 'Juan Doe',
+        new_status: data[0].status,
+        location_id: data[0].last_location_id,
+        location_name: data[0].last_location_name,
+        beer_type: data[0].beer_type
+      }]);
+      this.addNotification({ title: 'Nuevo Activo', message: `Barril ${data[0].code} registrado.`, type: 'success' });
     }
+    this.refreshAll();
   }
 
-  deleteLocation(id: string) {
-    const barrelCount = this.barrels.filter(b => b.lastLocationId === id).length;
-    if (barrelCount > 0) {
-      return { success: false, error: 'No se puede eliminar una ubicación con barriles asignados.' };
-    }
-    this.locations = this.locations.filter(l => l.id !== id);
-    this.save();
+  async addLocation(name: string, address: string) {
+    await supabase.from('locations').insert([{ name, address }]);
+    this.refreshAll();
+  }
+
+  async updateLocation(id: string, updates: Partial<Location>) {
+    await supabase.from('locations').update(updates).eq('id', id);
+    this.refreshAll();
+  }
+
+  async deleteLocation(id: string) {
+    // Fix: Use camelCase property lastLocationId instead of snake_case last_location_id
+    const hasBarrels = this.barrelsCache.some(b => b.lastLocationId === id);
+    if (hasBarrels) return { success: false, error: 'Ubicación con barriles asignados.' };
+    await supabase.from('locations').delete().eq('id', id);
+    this.refreshAll();
     return { success: true };
   }
 
-  addRecipe(recipe: Partial<Recipe>) {
-    const newRecipe: Recipe = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: recipe.name || 'Nueva Receta',
-      description: recipe.description || '',
-      ingredients: recipe.ingredients || [],
-      steps: recipe.steps || []
-    };
-    this.recipes.push(newRecipe);
-    this.save();
-    return newRecipe;
-  }
-
-  addEvent(eventData: Partial<BreweryEvent>) {
-    const newEvent: BreweryEvent = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: eventData.name || 'Nuevo Evento',
-      date: eventData.date || new Date().toISOString().split('T')[0],
-      notes: eventData.notes || '',
-      barrelIds: eventData.barrelIds || [],
-      checklist: eventData.checklist || []
-    };
-    this.events.push(newEvent);
-
-    this.addNotification({
-      title: 'Evento Programado',
-      message: `Se ha creado el evento "${newEvent.name}" para el día ${newEvent.date}.`,
-      type: 'info'
-    });
-
-    this.save();
-    return newEvent;
-  }
-
-  updateEvent(eventId: string, updates: Partial<BreweryEvent>) {
-    const index = this.events.findIndex(e => e.id === eventId);
-    if (index !== -1) {
-      this.events[index] = { ...this.events[index], ...updates };
-      this.save();
-      return this.events[index];
-    }
-  }
-
-  updateBarrelStatus(barrelId: string, newStatus: BarrelStatus | undefined, details: { locationId?: string, beerType?: BeerType, eventId?: string, notes?: string }) {
-    const barrel = this.barrels.find(b => b.id === barrelId);
-    if (!barrel) return;
+  async updateBarrelStatus(barrelId: string, newStatus: BarrelStatus | undefined, details: { locationId?: string, beerType?: BeerType, eventId?: string, notes?: string }): Promise<Barrel | null> {
+    const barrel = this.barrelsCache.find(b => b.id === barrelId);
+    if (!barrel) return null;
 
     const previousStatus = barrel.status;
     const finalStatus = newStatus || previousStatus;
-    
-    this.events.forEach(e => {
-      e.barrelIds = e.barrelIds.filter(id => id !== barrelId);
-    });
 
-    barrel.status = finalStatus;
-    barrel.lastUpdate = new Date().toISOString();
-
-    if (details.beerType) {
-      barrel.beerType = details.beerType;
-    }
-
-    if (details.locationId) {
-      const loc = this.locations.find(l => l.id === details.locationId);
-      if (loc) {
-        barrel.lastLocationId = loc.id;
-        barrel.lastLocationName = loc.name;
-      }
-    }
-
-    let eventName: string | undefined;
-    if (finalStatus === BarrelStatus.EN_EVENTO && details.eventId) {
-      const event = this.events.find(e => e.id === details.eventId);
-      if (event) {
-        eventName = event.name;
-        if (!event.barrelIds.includes(barrelId)) {
-          event.barrelIds.push(barrelId);
-        }
-      }
-    }
-
-    const activity: Activity = {
-      id: Math.random().toString(36).substr(2, 9),
-      barrelId,
-      barrelCode: barrel.code,
-      userId: 'user-1',
-      userName: 'Juan Doe',
-      previousStatus: previousStatus,
-      newStatus: finalStatus,
-      locationId: barrel.lastLocationId,
-      locationName: barrel.lastLocationName,
-      beerType: details.beerType || barrel.beerType,
-      eventName,
-      notes: details.notes,
-      createdAt: new Date().toISOString()
+    const updateData: any = {
+      status: finalStatus,
+      last_update: new Date().toISOString()
     };
 
-    this.activities.push(activity);
-
-    if (previousStatus !== finalStatus) {
-      this.addNotification({
-        title: `Cambio de Estado: ${barrel.code}`,
-        message: `Barril ${barrel.code} ahora está en estado ${finalStatus.replace(/_/g, ' ')}.`,
-        type: finalStatus === BarrelStatus.EN_BODEGA_SUCIO ? 'warning' : 'info'
-      });
+    if (details.beerType) updateData.beer_type = details.beerType;
+    if (details.locationId) {
+      const loc = this.locationsCache.find(l => l.id === details.locationId);
+      if (loc) {
+        updateData.last_location_id = loc.id;
+        updateData.last_location_name = loc.name;
+      }
     }
 
-    this.save();
-    return barrel;
+    const { data: updatedBarrel } = await supabase.from('barrels').update(updateData).eq('id', barrelId).select();
+
+    if (updatedBarrel && updatedBarrel[0]) {
+      await supabase.from('activities').insert([{
+        barrel_id: barrelId,
+        barrel_code: barrel.code,
+        user_name: 'Juan Doe',
+        previous_status: previousStatus,
+        new_status: finalStatus,
+        // Fix: Use camelCase properties lastLocationId, lastLocationName, and beerType instead of snake_case
+        location_id: updateData.last_location_id || barrel.lastLocationId,
+        location_name: updateData.last_location_name || barrel.lastLocationName,
+        beer_type: details.beerType || barrel.beerType,
+        notes: details.notes
+      }]);
+    }
+    
+    // Refresh cache to ensure data is updated everywhere
+    await this.refreshAll();
+
+    // Map and return properly typed Barrel
+    if (updatedBarrel && updatedBarrel[0]) {
+      const item = updatedBarrel[0];
+      return {
+        id: item.id,
+        code: item.code,
+        capacity: item.capacity,
+        beerType: item.beer_type,
+        status: item.status,
+        lastLocationId: item.last_location_id,
+        lastLocationName: item.last_location_name,
+        lastUpdate: item.last_update,
+        createdAt: item.created_at
+      };
+    }
+    
+    return null;
   }
 
-  addComment(barrelId: string, content: string) {
-    const comment: Comment = {
-      id: Math.random().toString(36).substr(2, 9),
-      barrelId,
-      userId: 'user-1',
-      userName: 'Juan Doe',
-      content,
-      createdAt: new Date().toISOString()
-    };
-    this.comments.push(comment);
-    this.save();
-    return comment;
+  async addRecipe(recipe: Partial<Recipe>) {
+    await supabase.from('recipes').insert([{
+      name: recipe.name,
+      description: recipe.description,
+      ingredients: recipe.ingredients,
+      steps: recipe.steps
+    }]);
+    this.refreshAll();
+  }
+
+  async addEvent(eventData: Partial<BreweryEvent>) {
+    await supabase.from('events').insert([{
+      name: eventData.name,
+      date: eventData.date,
+      notes: eventData.notes,
+      barrel_ids: eventData.barrelIds,
+      checklist: eventData.checklist
+    }]);
+    this.refreshAll();
+  }
+
+  // Fix: Added missing updateEvent method to resolve errors in Events.tsx
+  async updateEvent(id: string, updates: Partial<BreweryEvent>) {
+    const updatePayload: any = {};
+    if (updates.name !== undefined) updatePayload.name = updates.name;
+    if (updates.date !== undefined) updatePayload.date = updates.date;
+    if (updates.notes !== undefined) updatePayload.notes = updates.notes;
+    if (updates.barrelIds !== undefined) updatePayload.barrel_ids = updates.barrelIds;
+    if (updates.checklist !== undefined) updatePayload.checklist = updates.checklist;
+
+    await supabase.from('events').update(updatePayload).eq('id', id);
+    this.refreshAll();
   }
 }
 
-export const storage = new MockStorage();
+export const storage = new DatabaseStorage();
+// Inicialización de la cache
+storage.refreshAll();

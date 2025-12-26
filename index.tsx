@@ -4,8 +4,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { storage } from './services/mockData';
 
-// Asegurar carga inicial de datos desde Supabase
-storage.refreshAll();
+// Intentar carga inicial pero sin bloquear el renderizado
+try {
+  storage.refreshAll().catch(e => console.error("Initial refresh failed:", e));
+} catch (e) {
+  console.error("Critical storage error:", e);
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

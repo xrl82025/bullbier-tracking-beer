@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'wouter';
 import { Search as SearchIcon, Bell, QrCode, X, Beer, MapPin, ChevronRight, Clock, Sparkles, Sun, Moon, Info, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
@@ -101,7 +100,7 @@ const Header: React.FC<HeaderProps> = ({ isCollapsed }) => {
             <div className="bg-primary-light dark:bg-primary/20 p-1.5 rounded-lg">
               <Beer className="w-5 h-5 text-primary" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">BarrelTrack</h1>
+            <h1 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Bullbier Tracking</h1>
           </a>
         </Link>
         

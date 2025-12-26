@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { NAVIGATION_ITEMS } from '../constants';
@@ -37,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, user, on
           {!isCollapsed && (
             <div className="flex items-center gap-2 animate-in fade-in duration-300">
               <Beer className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-medium tracking-tight text-slate-800 dark:text-white">BarrelTrack</h1>
+              <h1 className="text-xl font-medium tracking-tight text-slate-800 dark:text-white">Bullbier Tracking</h1>
             </div>
           )}
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { authService } from '../services/authService';
 import { Beer, Lock, Mail, Eye, EyeOff, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
@@ -45,7 +44,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <Beer className="w-8 h-8 group-hover:rotate-12 transition-transform" />
           </div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-            Barrel<span className="text-primary">Track</span>
+            Bullbier <span className="text-primary">Tracking</span>
           </h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium">Gestión Cervecera de Alto Nivel</p>
         </div>

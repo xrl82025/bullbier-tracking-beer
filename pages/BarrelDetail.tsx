@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
-import { storage } from '../services/mockData';
-import { Barrel, BarrelStatus, Activity, Comment, Location, BeerType, BreweryEvent } from '../types';
+import { useStorage } from '../services/mockData';
+import { Barrel, BarrelStatus, Activity, Comment, Location, BeerType, BreweryEvent, Batch } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import { BEER_TYPE_COLORS } from '../constants';
 import { 
@@ -12,24 +12,22 @@ import {
   Calendar, 
   QrCode, 
   Edit3, 
-  MessageSquare, 
   History as HistoryIcon,
   ChevronRight,
   ChevronLeft,
-  Send,
   Download,
-  Beer,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Layers
 } from 'lucide-react';
 
 const BarrelDetail: React.FC = () => {
   const [, params] = useRoute('/barrels/:id');
   const [, setLocation] = useLocation();
+  const storage = useStorage();
+  
   const [barrel, setBarrel] = useState<Barrel | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
   const [showStatusModal, setShowStatusModal] = useState(false);
   
   // Navigation State
@@ -42,83 +40,57 @@ const BarrelDetail: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<BarrelStatus | "">("");
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [selectedBeerType, setSelectedBeerType] = useState<BeerType | "">("");
+  const [selectedBatchId, setSelectedBatchId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
   const [updateNotes, setUpdateNotes] = useState("");
 
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [events, setEvents] = useState<BreweryEvent[]>([]);
+  const locations = storage.getLocations();
+  const events = storage.getEvents();
+  const batches = storage.getBatches();
 
   useEffect(() => {
     if (params?.id) {
       refreshData();
     }
-  }, [params?.id]);
+  }, [params?.id, storage.getBarrels().length]);
 
   const refreshData = () => {
     const allBarrels = storage.getBarrels();
     const b = allBarrels.find(item => item.id === params?.id);
     
     if (b) {
-      const allEvents = storage.getEvents();
       setBarrel({ ...b });
       setActivities([...storage.getActivities().filter(a => a.barrelId === b.id)]);
-      setComments([...storage.getComments(b.id)]);
-      setLocations([...storage.getLocations()]);
-      setEvents([...allEvents]);
       
-      // Calculate navigation
       const index = allBarrels.findIndex(item => item.id === b.id);
       setCurrentIndex(index);
       setTotalBarrels(allBarrels.length);
       
-      if (index > 0) {
-        setPrevBarrelId(allBarrels[index - 1].id);
-      } else {
-        setPrevBarrelId(null);
-      }
-      
-      if (index < allBarrels.length - 1) {
-        setNextBarrelId(allBarrels[index + 1].id);
-      } else {
-        setNextBarrelId(null);
-      }
+      setPrevBarrelId(index > 0 ? allBarrels[index - 1].id : null);
+      setNextBarrelId(index < allBarrels.length - 1 ? allBarrels[index + 1].id : null);
 
-      // Default values for modal
       setSelectedLocationId(b.lastLocationId);
       setSelectedBeerType(b.beerType);
       setSelectedStatus(b.status);
-      
-      const currentEv = allEvents.find(e => e.id === b.id); // Placeholder for actual event logic if needed
-      if (currentEv) setSelectedEventId(currentEv.id);
-      else setSelectedEventId("");
     }
   };
 
   if (!barrel) return <div className="p-8 text-center text-slate-500">Cargando barril...</div>;
 
-  // Fixed: Made handleUpdateStatus async and added await for storage.updateBarrelStatus
   const handleUpdateStatus = async () => {
+    // Fixed: Removed 'eventId' from details object as it is not part of updateBarrelStatus expected properties
     const updated = await storage.updateBarrelStatus(barrel.id, (selectedStatus as BarrelStatus) || undefined, {
       locationId: selectedLocationId,
       beerType: selectedBeerType as BeerType || undefined,
-      eventId: selectedEventId || undefined,
+      batchId: selectedBatchId || undefined,
       notes: updateNotes
     });
 
     if (updated) {
-      // Since refreshAll is called inside updateBarrelStatus, we should use the updated object from cache
-      // to ensure correct mapping from camelCase/snakeCase if applicable
-      const freshBarrel = storage.getBarrel(barrel.id);
-      if (freshBarrel) {
-        setBarrel({ ...freshBarrel });
-      } else {
-        // Fallback to updated record if not found in cache for some reason
-        setBarrel({ ...updated });
-      }
-      setActivities([...storage.getActivities().filter(a => a.barrelId === barrel.id)]);
-      setEvents([...storage.getEvents()]);
       setShowStatusModal(false);
       setUpdateNotes("");
+      setSelectedBatchId("");
+      refreshData();
     }
   };
 
@@ -141,8 +113,14 @@ const BarrelDetail: React.FC = () => {
   };
 
   const currentEvent = events.find(e => e.barrelIds.includes(barrel.id));
-
   const beerColorClasses = BEER_TYPE_COLORS[barrel.beerType] || 'bg-slate-50 text-slate-800 border-slate-100 hover:bg-slate-100 dark:bg-slate-900/50 dark:text-slate-200 dark:border-slate-800';
+
+  // Filtrar lotes disponibles para la variedad seleccionada
+  const availableBatches = batches.filter(bat => 
+    bat.beerType === (selectedBeerType || barrel.beerType) && 
+    bat.status !== 'terminado' &&
+    bat.remainingLiters >= barrel.capacity
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -161,7 +139,6 @@ const BarrelDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Controls */}
         <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-1.5 shadow-sm">
           <button 
             disabled={!prevBarrelId}
@@ -204,18 +181,9 @@ const BarrelDetail: React.FC = () => {
                 <div className="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-700">
                   <span className="text-slate-500 dark:text-slate-400 font-medium text-sm">Variedad</span>
                   {barrel.status !== BarrelStatus.EN_BODEGA_LIMPIO ? (
-                    <button 
-                      onClick={() => {
-                        setSelectedStatus(barrel.status);
-                        setSelectedBeerType(barrel.beerType);
-                        setSelectedLocationId(barrel.lastLocationId);
-                        setShowStatusModal(true);
-                      }}
-                      className={`flex items-center gap-1.5 font-bold text-right text-sm transition-all group px-4 py-1.5 border rounded-xl ${beerColorClasses}`}
-                    >
+                    <span className={`inline-flex items-center gap-1.5 font-bold text-sm px-4 py-1.5 border rounded-xl ${beerColorClasses}`}>
                       {barrel.beerType}
-                      <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                    </button>
+                    </span>
                   ) : (
                     <span className="text-slate-400 dark:text-slate-500 italic text-sm font-semibold py-1.5">Barril Vacío / Limpio</span>
                   )}
@@ -232,25 +200,11 @@ const BarrelDetail: React.FC = () => {
                       setSelectedLocationId(barrel.lastLocationId);
                       setShowStatusModal(true);
                     }}
-                    className="flex items-center gap-1.5 font-bold text-primary dark:text-blue-400 text-right text-sm hover:underline group px-3 py-1 border border-primary/5 dark:border-primary/10 rounded-lg hover:bg-primary/5 dark:hover:bg-primary/10"
+                    className="flex items-center gap-1.5 font-bold text-primary dark:text-blue-400 text-right text-sm hover:underline group px-3 py-1 border border-primary/5 dark:border-primary/10 rounded-lg"
                   >
-                    {barrel.status === BarrelStatus.EN_EVENTO ? (
-                      <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    ) : (
-                      <MapPin className="w-4 h-4" />
-                    )}
-                    <span className={barrel.status === BarrelStatus.EN_EVENTO ? "text-purple-600 dark:text-purple-400" : ""}>
-                      {barrel.status === BarrelStatus.EN_EVENTO 
-                        ? (currentEvent?.name || "En Evento")
-                        : barrel.lastLocationName
-                      }
-                    </span>
-                    <Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                    {barrel.status === BarrelStatus.EN_EVENTO ? <Calendar className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                    <span>{barrel.status === BarrelStatus.EN_EVENTO ? (currentEvent?.name || "En Evento") : barrel.lastLocationName}</span>
                   </button>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium text-sm">Ingreso</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{new Date(barrel.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
@@ -272,7 +226,7 @@ const BarrelDetail: React.FC = () => {
                   setSelectedLocationId(barrel.lastLocationId);
                   setShowStatusModal(true);
                 }}
-                className="w-full mt-8 bg-primary text-white py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-primary-dark transition-all text-sm active:scale-95"
+                className="w-full mt-8 bg-primary text-white py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-primary-dark transition-all text-sm active:scale-95 shadow-lg"
               >
                 Actualizar Estado
                 <Edit3 className="w-4 h-4" />
@@ -293,32 +247,19 @@ const BarrelDetail: React.FC = () => {
                   </div>
                   <div className="flex-1 -mt-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Evento</span>
-                      <ChevronRight className="w-3 h-3 text-slate-300 dark:text-slate-600" />
                       <StatusBadge status={act.newStatus} showIcon={false} />
+                      {act.batchId && (
+                        <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase tracking-widest">
+                          LOTE {act.batchId.slice(-4)}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2 mb-3">
                       <span className="text-primary dark:text-blue-400 font-bold">{act.userName}</span> • {new Date(act.createdAt).toLocaleString()}
                     </p>
                     <div className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-3xl text-sm text-slate-600 dark:text-slate-300 border border-slate-100/50 dark:border-slate-800">
-                      <div className="flex items-center gap-1.5 mb-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                        {act.newStatus === BarrelStatus.EN_EVENTO && act.eventName ? (
-                          <>
-                            <Calendar className="w-3 h-3 text-purple-500 dark:text-purple-400" />
-                            {act.eventName}
-                          </>
-                        ) : (
-                          <>
-                            <MapPin className="w-3 h-3 text-rose-500 dark:text-rose-400" />
-                            {act.locationName}
-                          </>
-                        )}
-                      </div>
                       <p className="leading-relaxed font-medium">
-                        {act.newStatus === BarrelStatus.LLENADO ? `Llenado: ${act.beerType}` : 
-                         act.newStatus === BarrelStatus.EN_TRANSITO ? `En tránsito hacia ${act.locationName}` :
-                         act.newStatus === BarrelStatus.ENTREGADO ? `Entregado en ${act.locationName}` :
-                         act.newStatus === BarrelStatus.EN_EVENTO ? `Desplegado en ${act.eventName || 'Evento'}` :
+                        {act.newStatus === BarrelStatus.LLENADO ? `Llenado con ${act.beerType} desde fermentador.` : 
                          act.notes || "Actualización de registro."}
                       </p>
                     </div>
@@ -346,7 +287,7 @@ const BarrelDetail: React.FC = () => {
             </div>
             <button 
               onClick={handleDownloadQR}
-              className="w-full flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 py-4 rounded-3xl font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-700 text-xs uppercase tracking-widest active:scale-95"
+              className="w-full flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 py-4 rounded-3xl font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-100 dark:border-slate-700 text-xs uppercase tracking-widest"
             >
               <Download className="w-4 h-4" />
               Descargar QR
@@ -364,7 +305,7 @@ const BarrelDetail: React.FC = () => {
                 <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">ACTIVO: {barrel.code}</p>
               </div>
               <button onClick={() => setShowStatusModal(false)} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors group">
-                <X className="w-6 h-6 text-slate-300 dark:text-slate-500 group-hover:text-slate-500 transition-colors" />
+                <X className="w-6 h-6 text-slate-300 dark:text-slate-500 group-hover:text-slate-500" />
               </button>
             </div>
             
@@ -382,43 +323,59 @@ const BarrelDetail: React.FC = () => {
                 </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">UBICACIÓN ACTUAL / DESTINO</label>
-                <select 
-                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm"
-                  value={selectedLocationId}
-                  onChange={(e) => setSelectedLocationId(e.target.value)}
-                >
-                  {locations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedStatus !== BarrelStatus.EN_BODEGA_LIMPIO && (
-                <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">VARIEDAD DE CERVEZA</label>
-                  <select 
-                    className={`w-full ${selectedStatus === BarrelStatus.LLENADO ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'bg-slate-50 dark:bg-slate-900'} border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm`}
-                    value={selectedBeerType}
-                    onChange={(e) => setSelectedBeerType(e.target.value as BeerType)}
-                  >
-                    {Object.values(BeerType).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+              {selectedStatus === BarrelStatus.LLENADO && (
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                   <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">VARIEDAD A LLENAR</label>
+                    <select 
+                      className="w-full bg-blue-50/50 dark:bg-blue-900/20 border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm"
+                      value={selectedBeerType}
+                      onChange={(e) => {
+                        setSelectedBeerType(e.target.value as BeerType);
+                        setSelectedBatchId("");
+                      }}
+                    >
+                      {Object.values(BeerType).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                      <Layers className="w-3 h-3" />
+                      SELECCIONAR LOTE / FERMENTADOR
+                    </label>
+                    <select 
+                      required
+                      className="w-full bg-amber-50/50 dark:bg-amber-900/20 border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm"
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(e.target.value)}
+                    >
+                      <option value="">-- Elige un lote activo --</option>
+                      {availableBatches.map(bat => (
+                        <option key={bat.id} value={bat.id}>
+                          {bat.fermenterName} - {bat.remainingLiters}L rest.
+                        </option>
+                      ))}
+                    </select>
+                    {availableBatches.length === 0 && selectedBeerType && (
+                      <p className="text-[10px] font-bold text-rose-500 mt-1 ml-1 uppercase">
+                        No hay lotes de {selectedBeerType} con litros suficientes.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {selectedStatus === BarrelStatus.EN_EVENTO && (
-                <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">VINCULAR A EVENTO</label>
+              {selectedStatus !== BarrelStatus.LLENADO && (
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">UBICACIÓN ACTUAL / DESTINO</label>
                   <select 
-                    className="w-full bg-purple-50/50 dark:bg-purple-900/20 border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm"
-                    value={selectedEventId}
-                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-3.5 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer text-sm"
+                    value={selectedLocationId}
+                    onChange={(e) => setSelectedLocationId(e.target.value)}
                   >
-                    <option value="">Selecciona el evento...</option>
-                    {events.map(ev => (
-                      <option key={ev.id} value={ev.id}>{ev.name} ({ev.date})</option>
+                    {locations.map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
                     ))}
                   </select>
                 </div>
@@ -443,7 +400,8 @@ const BarrelDetail: React.FC = () => {
                 </button>
                 <button 
                   onClick={handleUpdateStatus}
-                  className="flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest bg-primary hover:bg-primary-dark active:scale-95"
+                  disabled={selectedStatus === BarrelStatus.LLENADO && !selectedBatchId}
+                  className="flex-1 py-3 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Guardar

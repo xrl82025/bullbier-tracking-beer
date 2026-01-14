@@ -16,7 +16,8 @@ import {
   Truck,
   Trash2,
   Archive,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import { BarrelStatus, BeerType } from './types';
 
@@ -69,6 +70,7 @@ export const NAVIGATION_ITEMS = [
   { label: 'Dashboard', path: '/', icon: <LayoutDashboard className="w-5 h-5" /> },
   { label: 'Agente IA', path: '/ai-agent', icon: <Sparkles className="w-5 h-5" /> },
   { label: 'Barriles', path: '/barrels', icon: <Beer className="w-5 h-5" /> },
+  { label: 'Lotes', path: '/batches', icon: <Layers className="w-5 h-5" /> },
   { label: 'Escanear QR', path: '/scan', icon: <QrCode className="w-5 h-5" /> },
   { label: 'Ubicaciones', path: '/locations', icon: <MapPin className="w-5 h-5" /> },
   { label: 'Historial', path: '/history', icon: <History className="w-5 h-5" /> },

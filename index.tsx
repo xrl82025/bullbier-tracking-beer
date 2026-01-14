@@ -4,12 +4,14 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { storage } from './services/mockData';
 
-// Intentar carga inicial pero sin bloquear el renderizado
-try {
-  storage.refreshAll().catch(e => console.error("Initial refresh failed:", e));
-} catch (e) {
-  console.error("Critical storage error:", e);
-}
+// Inicialización asíncrona pero sin bloquear el renderizado inicial de React
+(async () => {
+  try {
+    await storage.refreshAll();
+  } catch (e) {
+    console.warn("Storage Initialization: Sincronización fallida, usando caché local.", e);
+  }
+})();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

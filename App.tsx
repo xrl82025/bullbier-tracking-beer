@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import Barrels from './pages/Barrels';
 import BarrelDetail from './pages/BarrelDetail';
+import Batches from './pages/Batches';
 import ScanQR from './pages/ScanQR';
 import Metrics from './pages/Metrics';
 import Locations from './pages/Locations';
@@ -39,7 +40,6 @@ const Layout: React.FC<{ children: React.ReactNode; user: UserSession; onLogout:
             {children}
           </div>
         </main>
-        {/* Hide widget if already on the dedicated AI page */}
         {!isAIPage && <AIChatWidget />}
       </div>
     </div>
@@ -89,6 +89,7 @@ const App: React.FC = () => {
           </Route>
           <Route path="/barrels" component={Barrels} />
           <Route path="/barrels/:id" component={BarrelDetail} />
+          <Route path="/batches" component={Batches} />
           <Route path="/scan" component={ScanQR} />
           <Route path="/locations" component={Locations} />
           <Route path="/history" component={HistoryPage} />

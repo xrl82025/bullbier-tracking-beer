@@ -43,6 +43,17 @@ export interface Location {
   barrelCount?: number;
 }
 
+export interface Batch {
+  id: string;
+  fermenterName: string;
+  beerType: BeerType;
+  totalLiters: number;
+  remainingLiters: number;
+  fillingDate: string;
+  status: 'fermentando' | 'madurando' | 'listo' | 'terminado';
+  createdAt: string;
+}
+
 export interface Activity {
   id: string;
   barrelId: string;
@@ -54,6 +65,7 @@ export interface Activity {
   locationId?: string;
   locationName?: string;
   beerType?: BeerType;
+  batchId?: string;
   eventName?: string;
   notes?: string;
   createdAt: string;

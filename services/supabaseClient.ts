@@ -1,19 +1,25 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Intentamos obtener las variables definidas por Vite o directamente de process.env
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+// Intentamos obtener las variables de entorno de forma segura
+const getEnv = (key: string) => {
+  try {
+    return process.env[key] || '';
+  } catch {
+    return '';
+  }
+};
 
-// Si faltan las credenciales, informamos pero no rompemos la carga del JS
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase: Credenciales no encontradas en el primer intento. Verificando configuración...");
-}
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY');
 
-export const supabase = (supabaseUrl && supabaseUrl !== 'undefined' && supabaseAnonKey && supabaseAnonKey !== 'undefined') 
+const isValid = (val: string) => val && val !== 'undefined' && val !== 'null' && val.length > 10;
+
+// Exportamos el cliente solo si las credenciales parecen válidas
+export const supabase = isValid(supabaseUrl) && isValid(supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
-  : null as any;
+  : null;
 
 if (!supabase) {
-  console.error("CRÍTICO: El cliente de Supabase no pudo inicializarse. La app funcionará en modo offline limitado.");
+  console.warn("Bullbier: Supabase no disponible. Iniciando motor de persistencia local (Offline Mode).");
 }

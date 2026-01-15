@@ -149,9 +149,9 @@ const Locations: React.FC = () => {
       </div>
 
       {(showAddModal || editingLocation) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 dark:bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-700 animate-in zoom-in-95 duration-200 mx-4">
-            <div className="px-8 pt-8 pb-4 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 dark:bg-black/60 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-700 animate-in zoom-in-95 duration-200 mx-4 flex flex-col">
+            <div className="px-8 pt-8 pb-4 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 relative shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
                   {editingLocation ? 'Editar Ubicación' : 'Nueva Ubicación'}
@@ -165,16 +165,16 @@ const Locations: React.FC = () => {
                 <X className="w-6 h-6 text-slate-300 dark:text-slate-500 group-hover:text-slate-500 transition-colors" />
               </button>
             </div>
-            <form onSubmit={editingLocation ? handleEdit : handleAdd} className="px-8 py-6 space-y-6">
+            <form onSubmit={editingLocation ? handleEdit : handleAdd} className="px-8 py-6 space-y-6 overflow-y-auto custom-scrollbar">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">NOMBRE DE LA UBICACIÓN</label>
-                <input required type="text" className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Depósito Central" />
+                <input required type="text" className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-sm" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Depósito Central" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">DIRECCIÓN FÍSICA</label>
-                <input required type="text" className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600" value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle y número" />
+                <input required type="text" className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-sm" value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle y número" />
               </div>
-              <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all mt-4 text-base active:scale-95">
+              <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all mt-4 text-base active:scale-95 shadow-lg shadow-primary/20">
                 {editingLocation ? 'Guardar Cambios' : 'Confirmar Registro'}
               </button>
             </form>

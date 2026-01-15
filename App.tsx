@@ -28,7 +28,7 @@ const Layout: React.FC<{ children: React.ReactNode; user: UserSession; onLogout:
   return (
     <div className="flex bg-[#f8fafc] dark:bg-slate-950 min-h-screen transition-colors duration-300 overflow-x-hidden">
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} user={user} onLogout={onLogout} />
-      <div className="flex-1 flex flex-col min-h-screen relative w-full overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-h-screen w-full overflow-x-hidden">
         <Header isCollapsed={isCollapsed} />
         <main 
           className={`flex-1 transition-all duration-300 ease-in-out 

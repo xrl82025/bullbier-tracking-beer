@@ -132,12 +132,12 @@ const Barrels: React.FC = () => {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 dark:bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700 mx-4">
-            <div className="px-8 pt-8 pb-4 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 dark:bg-black/60 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700 mx-4 flex flex-col max-h-[90vh]">
+            <div className="px-8 pt-8 pb-4 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 relative shrink-0">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Nuevo Barril</h2>
-                <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">REGISTRO DE ACTIVO</p>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">Nuevo Barril</h2>
+                <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2">REGISTRO DE ACTIVO</p>
               </div>
               <button 
                 onClick={() => setShowAddModal(false)} 
@@ -147,14 +147,14 @@ const Barrels: React.FC = () => {
               </button>
             </div>
             
-            <form onSubmit={handleAddBarrel} className="px-8 py-6 space-y-6">
+            <form onSubmit={handleAddBarrel} className="px-8 py-6 space-y-6 overflow-y-auto custom-scrollbar">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">CÓDIGO IDENTIFICADOR</label>
                 <input 
                   required
                   type="text" 
                   placeholder="BRL-000"
-                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-sm"
                   value={newBarrel.code}
                   onChange={(e) => setNewBarrel({...newBarrel, code: e.target.value.toUpperCase()})}
                 />
@@ -166,7 +166,7 @@ const Barrels: React.FC = () => {
                   <input 
                     required
                     type="number" 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                     value={newBarrel.capacity}
                     onChange={(e) => setNewBarrel({...newBarrel, capacity: parseInt(e.target.value)})}
                   />
@@ -174,7 +174,7 @@ const Barrels: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">VARIEDAD</label>
                   <select 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer shadow-sm"
                     value={newBarrel.beerType}
                     onChange={(e) => setNewBarrel({...newBarrel, beerType: e.target.value as BeerType})}
                   >
@@ -186,7 +186,7 @@ const Barrels: React.FC = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">UBICACIÓN INICIAL</label>
                 <select 
-                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-2xl p-4 font-semibold text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer shadow-sm"
                   value={newBarrel.locationId}
                   onChange={(e) => setNewBarrel({...newBarrel, locationId: e.target.value})}
                 >
@@ -196,7 +196,7 @@ const Barrels: React.FC = () => {
 
               <button 
                 type="submit"
-                className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all mt-4 text-base active:scale-95"
+                className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-primary-dark transition-all mt-4 text-base active:scale-95 shadow-lg shadow-primary/20"
               >
                 Confirmar Registro
               </button>

@@ -32,7 +32,7 @@ class DatabaseStorage {
 
     this.barrelsCache = load('barrels', []);
     this.locationsCache = load('locations', [
-      { id: 'loc-1', name: 'Bodega Principal', address: 'Calle Falsa 123', lat: '-34.6', lng: '-58.4' }
+      { id: 'loc-1', name: 'Bodega Principal', address: 'Planta de Producción Bullbier', lat: '-34.6', lng: '-58.4' }
     ]);
     this.activitiesCache = load('activities', []);
     this.notificationsCache = load('notifications', []);
@@ -245,6 +245,22 @@ class DatabaseStorage {
       this.saveToLocalStorage();
     }
     await this.refreshAll();
+  }
+
+  async deleteBarrel(id: string) {
+    if (supabase) {
+      const { error } = await supabase.from('barrels').delete().eq('id', id);
+      if (error) {
+        console.error("Error deleting barrel:", error);
+        return false;
+      }
+    } else {
+      this.barrelsCache = this.barrelsCache.filter(b => b.id !== id);
+      this.activitiesCache = this.activitiesCache.filter(a => a.barrelId !== id);
+      this.saveToLocalStorage();
+    }
+    await this.refreshAll();
+    return true;
   }
 
   async addLocation(name: string, address: string) {

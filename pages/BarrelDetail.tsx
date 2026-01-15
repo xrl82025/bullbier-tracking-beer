@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   Layers,
   Database,
-  Beer as BeerIcon
+  Beer as BeerIcon,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 const BarrelDetail: React.FC = () => {
@@ -30,6 +32,8 @@ const BarrelDetail: React.FC = () => {
   const [barrel, setBarrel] = useState<Barrel | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [prevBarrelId, setPrevBarrelId] = useState<string | null>(null);
   const [nextBarrelId, setNextBarrelId] = useState<string | null>(null);
@@ -95,6 +99,17 @@ const BarrelDetail: React.FC = () => {
     }
   };
 
+  const handleDeleteBarrel = async () => {
+    setIsDeleting(true);
+    const success = await storage.deleteBarrel(barrel.id);
+    if (success) {
+      setLocation('/barrels');
+    } else {
+      setIsDeleting(false);
+      alert("No se pudo eliminar el barril. Inténtalo de nuevo.");
+    }
+  };
+
   const handleDownloadQR = async () => {
     try {
       const imageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BARREL_CODE_${barrel.code}`;
@@ -149,33 +164,43 @@ const BarrelDetail: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-1.5 shadow-sm">
-            <button 
-              disabled={!prevBarrelId}
-              onClick={() => prevBarrelId && setLocation(`/barrels/${prevBarrelId}`)}
-              className={`p-3 rounded-full transition-all flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest ${
-                prevBarrelId 
-                  ? 'text-slate-600 dark:text-slate-300 hover:bg-slate-50' 
-                  : 'text-slate-200 cursor-not-allowed'
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
-            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {currentIndex + 1} / {totalBarrels}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-1.5 shadow-sm">
+              <button 
+                disabled={!prevBarrelId}
+                onClick={() => prevBarrelId && setLocation(`/barrels/${prevBarrelId}`)}
+                className={`p-3 rounded-full transition-all flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest ${
+                  prevBarrelId 
+                    ? 'text-slate-600 dark:text-slate-300 hover:bg-slate-50' 
+                    : 'text-slate-200 cursor-not-allowed'
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
+              <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                {currentIndex + 1} / {totalBarrels}
+              </div>
+              <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
+              <button 
+                disabled={!nextBarrelId}
+                onClick={() => nextBarrelId && setLocation(`/barrels/${nextBarrelId}`)}
+                className={`p-3 rounded-full transition-all flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest ${
+                  nextBarrelId 
+                    ? 'text-slate-600 dark:text-slate-300 hover:bg-slate-50' 
+                    : 'text-slate-200 cursor-not-allowed'
+                }`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <div className="w-px h-6 bg-slate-100 dark:bg-slate-800 mx-1" />
+
             <button 
-              disabled={!nextBarrelId}
-              onClick={() => nextBarrelId && setLocation(`/barrels/${nextBarrelId}`)}
-              className={`p-3 rounded-full transition-all flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest ${
-                nextBarrelId 
-                  ? 'text-slate-600 dark:text-slate-300 hover:bg-slate-50' 
-                  : 'text-slate-200 cursor-not-allowed'
-              }`}
+              onClick={() => setShowDeleteModal(true)}
+              className="p-3.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-full hover:bg-rose-100 transition-all border border-rose-100 dark:border-rose-900/30 shadow-sm"
+              title="Eliminar Barril"
             >
-              <ChevronRight className="w-4 h-4" />
+              <Trash2 className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -379,6 +404,45 @@ const BarrelDetail: React.FC = () => {
               >
                 <CheckCircle2 className="w-5 h-5" />
                 Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-rose-100 dark:border-rose-900/20 overflow-hidden animate-in zoom-in-95 duration-200 mx-4">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">¿Eliminar Barril {barrel.code}?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
+                Esta acción es irreversible. Se eliminará el barril y todo su historial operativo de la base de datos central.
+              </p>
+            </div>
+            <div className="flex border-t border-slate-50 dark:border-slate-700">
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="flex-1 py-5 text-sm font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors uppercase tracking-widest border-r border-slate-50 dark:border-slate-700"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleDeleteBarrel}
+                disabled={isDeleting}
+                className="flex-1 py-5 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <Clock className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </>
+                )}
               </button>
             </div>
           </div>

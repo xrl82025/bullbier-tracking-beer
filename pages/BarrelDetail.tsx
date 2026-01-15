@@ -18,7 +18,8 @@ import {
   X,
   CheckCircle2,
   Layers,
-  Database
+  Database,
+  Beer as BeerIcon
 } from 'lucide-react';
 
 const BarrelDetail: React.FC = () => {
@@ -114,9 +115,6 @@ const BarrelDetail: React.FC = () => {
 
   const beerColorClasses = BEER_TYPE_COLORS[barrel.beerType] || 'bg-slate-50 text-slate-800 border-slate-100 dark:bg-slate-900/50 dark:text-slate-200 dark:border-slate-800';
 
-  // Lógica de filtrado de lotes:
-  // Si la variedad es Golden Ale, Ambar Ale o Stout -> Solo lotes del mismo tipo.
-  // Si es cualquier otra -> Cualquier lote activo con stock.
   const availableBatches = batches.filter(bat => {
     const isStatusOk = bat.status !== 'terminado';
     const hasEnoughVolume = bat.remainingLiters >= barrel.capacity;
@@ -130,7 +128,6 @@ const BarrelDetail: React.FC = () => {
       return bat.beerType === currentType;
     }
     
-    // Variedades especiales pueden usar cualquier lote activo
     return true;
   });
 
@@ -239,6 +236,12 @@ const BarrelDetail: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                         <StatusBadge status={act.newStatus} showIcon={false} />
                         {act.batchId && <span className="text-[9px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase">LOTE #{act.batchId.slice(-4)}</span>}
+                        {act.newStatus === BarrelStatus.LLENADO && act.beerType && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase dark:bg-blue-900/30 dark:text-blue-400">
+                            <BeerIcon className="w-3 h-3" />
+                            {act.beerType}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 font-medium mb-2">{new Date(act.createdAt).toLocaleString()} • Por {act.userName}</p>
                       <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">

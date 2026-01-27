@@ -15,6 +15,7 @@ import HistoryPage from './pages/History';
 import Recipes from './pages/Recipes';
 import Events from './pages/Events';
 import AIAgent from './pages/AIAgent';
+import Settings from './pages/Settings';
 import AIChatWidget from './components/AIChatWidget';
 import Login from './pages/Login';
 import { authService, UserSession } from './services/authService';
@@ -97,6 +98,7 @@ const App: React.FC = () => {
           <Route path="/recipes" component={Recipes} />
           <Route path="/events" component={Events} />
           <Route path="/ai-agent" component={AIAgent} />
+          <Route path="/settings" component={Settings} />
           <Route>
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4 px-4">
               <h1 className="text-4xl font-bold text-secondary dark:text-white">404</h1>

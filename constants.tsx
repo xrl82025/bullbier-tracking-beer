@@ -77,4 +77,5 @@ export const NAVIGATION_ITEMS = [
   { label: 'Métricas', path: '/metrics', icon: <BarChart3 className="w-5 h-5" /> },
   { label: 'Recetas', path: '/recipes', icon: <BookOpen className="w-5 h-5" /> },
   { label: 'Eventos', path: '/events', icon: <Calendar className="w-5 h-5" /> },
+  { label: 'Configuración', path: '/settings', icon: <Settings className="w-5 h-5" /> },
 ];

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStorage } from '../services/mockData';
 import { BeerType, BarrelStatus } from '../types';
 import StatusBadge from '../components/StatusBadge';
-import { Search, Plus, ChevronRight, X } from 'lucide-react';
+import { Search, Plus, ChevronRight, X, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { Link } from 'wouter';
 
 const Barrels: React.FC = () => {
@@ -11,6 +11,8 @@ const Barrels: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [barrelToDelete, setBarrelToDelete] = useState<{id: string, code: string} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const storage = useStorage();
   const locations = storage.getLocations();
@@ -34,6 +36,18 @@ const Barrels: React.FC = () => {
     });
     setShowAddModal(false);
     setNewBarrel({ code: '', capacity: 50, beerType: BeerType.GOLDEN_ALE, locationId: locations[0]?.id || '' });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!barrelToDelete) return;
+    setIsDeleting(true);
+    const success = await storage.deleteBarrel(barrelToDelete.id);
+    if (success) {
+      setBarrelToDelete(null);
+    } else {
+      alert("No se pudo eliminar el barril. Asegúrate de que no tenga dependencias críticas.");
+    }
+    setIsDeleting(false);
   };
 
   const barrels = storage.getBarrels().filter(b => {
@@ -99,31 +113,47 @@ const Barrels: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {barrels.map((barrel) => (
-            <Link key={barrel.id} href={`/barrels/${barrel.id}`}>
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm active:scale-[0.98] transition-all cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary font-black text-sm">
-                      {barrel.code.slice(-3)}
+            <div key={barrel.id} className="group relative">
+              {/* Botón de eliminación rápida */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBarrelToDelete({id: barrel.id, code: barrel.code});
+                }}
+                className="absolute top-4 right-4 z-10 p-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-400 hover:text-rose-500 rounded-xl border border-slate-100 dark:border-slate-700 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                title="Eliminar Barril"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+
+              <Link href={`/barrels/${barrel.id}`}>
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm active:scale-[0.98] transition-all cursor-pointer hover:shadow-md">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center text-primary font-black text-sm">
+                        {barrel.code.slice(-3)}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white leading-tight">{barrel.code}</h3>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                          {barrel.capacity}L • {barrel.status === BarrelStatus.EN_BODEGA_LIMPIO ? 'Vacío' : barrel.beerType}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white leading-tight">{barrel.code}</h3>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
-                        {barrel.capacity}L • {barrel.status === BarrelStatus.EN_BODEGA_LIMPIO ? 'Vacío' : barrel.beerType}
-                      </p>
+                    <div className="mr-8 group-hover:mr-10 transition-all">
+                       <StatusBadge status={barrel.status} />
                     </div>
                   </div>
-                  <StatusBadge status={barrel.status} />
-                </div>
-                <div className="flex items-center justify-between text-xs pt-4 border-t border-slate-50 dark:border-slate-700">
-                  <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium">
-                    <div className="w-2 h-2 rounded-full bg-primary/40" />
-                    {barrel.lastLocationName}
+                  <div className="flex items-center justify-between text-xs pt-4 border-t border-slate-50 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium">
+                      <div className="w-2 h-2 rounded-full bg-primary/40" />
+                      {barrel.lastLocationName}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
           {barrels.length === 0 && (
             <div className="col-span-full py-12 text-center text-slate-400 italic text-sm">No se encontraron barriles</div>
@@ -131,6 +161,7 @@ const Barrels: React.FC = () => {
         </div>
       </div>
 
+      {/* Modal para añadir barril */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 dark:bg-black/60 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700 mx-4 flex flex-col max-h-[90vh]">
@@ -201,6 +232,46 @@ const Barrels: React.FC = () => {
                 Confirmar Registro
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de eliminación */}
+      {barrelToDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-rose-100 dark:border-rose-900/20 overflow-hidden animate-in zoom-in-95 duration-200 mx-4">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">¿Eliminar {barrelToDelete.code}?</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
+                Se eliminará el barril y todo su historial de la base de datos central. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex border-t border-slate-50 dark:border-slate-700">
+              <button 
+                onClick={() => setBarrelToDelete(null)}
+                disabled={isDeleting}
+                className="flex-1 py-5 text-sm font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors uppercase tracking-widest border-r border-slate-50 dark:border-slate-700"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="flex-1 py-5 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <Clock className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

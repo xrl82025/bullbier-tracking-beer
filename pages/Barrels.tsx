@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStorage } from '../services/mockData';
 import { BeerType, BarrelStatus } from '../types';
 import StatusBadge from '../components/StatusBadge';
-import { Search, Plus, ChevronRight, X, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { Search, Plus, ChevronRight, X, Trash2, AlertTriangle, Clock, RotateCcw, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
 
 const Barrels: React.FC = () => {
@@ -13,6 +13,7 @@ const Barrels: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [barrelToDelete, setBarrelToDelete] = useState<{id: string, code: string} | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const storage = useStorage();
   const locations = storage.getLocations();
@@ -23,6 +24,19 @@ const Barrels: React.FC = () => {
     beerType: BeerType.GOLDEN_ALE,
     locationId: locations[0]?.id || ''
   });
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    // Intentamos refrescar todo desde Supabase
+    const success = await storage.refreshCritical();
+    if (success) {
+      // Si la base de datos está vacía, refreshCritical habrá puesto el cache en []
+      console.log("Sincronización completada.");
+    } else {
+      alert("Error al sincronizar. Es posible que las tablas no existan o no haya conexión.");
+    }
+    setIsSyncing(false);
+  };
 
   const handleAddBarrel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,13 +79,23 @@ const Barrels: React.FC = () => {
             <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 dark:text-white tracking-tight">Gestión de Barriles</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Supervisa y organiza los activos de la cervecería.</p>
           </div>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="bg-primary text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-primary-dark transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm shrink-0 w-full md:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Registrar Barril
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="p-3 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center"
+              title="Sincronizar con Servidor"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            </button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-primary text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-primary-dark transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm shrink-0 w-full md:w-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar Barril
+            </button>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 p-2 rounded-2xl md:rounded-full border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center gap-2">
@@ -114,7 +138,6 @@ const Barrels: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {barrels.map((barrel) => (
             <div key={barrel.id} className="group relative">
-              {/* Botón de eliminación rápida */}
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -156,12 +179,14 @@ const Barrels: React.FC = () => {
             </div>
           ))}
           {barrels.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-400 italic text-sm">No se encontraron barriles</div>
+            <div className="col-span-full py-12 text-center text-slate-400 italic text-sm border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-3xl">
+              No hay barriles registrados. Haz clic en "Sincronizar" o "Registrar Barril".
+            </div>
           )}
         </div>
       </div>
 
-      {/* Modal para añadir barril */}
+      {/* Modales existentes se mantienen igual... */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 dark:bg-black/60 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700 mx-4 flex flex-col max-h-[90vh]">
@@ -236,7 +261,6 @@ const Barrels: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de confirmación de eliminación */}
       {barrelToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-rose-100 dark:border-rose-900/20 overflow-hidden animate-in zoom-in-95 duration-200 mx-4">

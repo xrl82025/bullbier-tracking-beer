@@ -115,9 +115,13 @@ class DatabaseStorage {
         supabase.from('batches').select('*').order('created_at', { ascending: false })
       ]);
 
-      if (b.error) throw b.error;
+      if (b.error) {
+        // Si hay error (ej: tabla no existe), no sobreescribimos el caché para permitir modo offline
+        console.error("Supabase Error:", b.error);
+        return false;
+      }
       
-      // Si la consulta es exitosa, b.data siempre existirá (aunque sea [])
+      // Actualizamos los caches. Si b.data es [], los caches quedarán vacíos (borrado real)
       this.barrelsCache = (b.data || []).map((item: any) => ({
         id: item.id,
         code: item.code,
@@ -174,7 +178,9 @@ class DatabaseStorage {
       return;
     }
     try {
-      await this.refreshCritical();
+      const success = await this.refreshCritical();
+      if (!success) return; // Si falló el crítico, no seguimos
+
       const now = Date.now();
       if ((now - this.lastStaticFetch) > this.STATIC_CACHE_TTL) {
         const [l, r, e] = await Promise.all([
@@ -183,12 +189,14 @@ class DatabaseStorage {
           supabase.from('events').select('*').order('date', { ascending: false })
         ]);
 
-        this.locationsCache = l.data || [];
-        this.recipesCache = (r.data || []) as Recipe[];
-        this.eventsCache = (e.data || []).map((ev: any) => ({
-          id: ev.id, name: ev.name, date: ev.date, notes: ev.notes,
-          barrelIds: ev.barrel_ids || [], checklist: ev.checklist || []
-        }));
+        if (l.data) this.locationsCache = l.data;
+        if (r.data) this.recipesCache = r.data as Recipe[];
+        if (e.data) {
+          this.eventsCache = e.data.map((ev: any) => ({
+            id: ev.id, name: ev.name, date: ev.date, notes: ev.notes,
+            barrelIds: ev.barrel_ids || [], checklist: ev.checklist || []
+          }));
+        }
         
         this.lastStaticFetch = now;
         this.saveToLocalStorage();

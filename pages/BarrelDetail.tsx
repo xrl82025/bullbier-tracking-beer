@@ -49,15 +49,22 @@ const BarrelDetail: React.FC = () => {
   const locations = storage.getLocations();
   const batches = storage.getBatches();
 
+  // Safely extract the ID to prevent 'possibly null' issues with params object
+  const barrelIdFromParams = params?.id;
+
+  // Use a stable reference for the ID in the dependency array
   useEffect(() => {
-    if (params?.id) {
+    if (barrelIdFromParams) {
       refreshData();
     }
-  }, [params?.id, storage.getBarrels().length]);
+  }, [barrelIdFromParams, storage.getBarrels().length]);
 
   const refreshData = () => {
+    // Double-check params existence for type safety
+    if (!params) return;
+
     const allBarrels = storage.getBarrels();
-    const b = allBarrels.find(item => item.id === params?.id);
+    const b = allBarrels.find(item => item.id === params.id);
     
     if (b) {
       setBarrel({ ...b });

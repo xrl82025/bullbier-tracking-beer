@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStorage } from '../services/mockData';
-import { Settings as SettingsIcon, User, Shield, Bell, Moon, Database, Globe, LogOut, Sun, CheckCircle2, Trash2, RotateCcw, AlertTriangle, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, Bell, Moon, Database, Globe, LogOut, Sun, CheckCircle2, Trash2, RotateCcw, AlertTriangle, Clock, Sparkles } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const storage = useStorage();

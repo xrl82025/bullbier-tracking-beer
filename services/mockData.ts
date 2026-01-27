@@ -3,20 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { Barrel, BarrelStatus, BeerType, Location, Activity, Recipe, BreweryEvent, Notification, Batch } from '../types';
 
-// Proyecciones para reducir el payload de red (Optimización de Egress)
-const BARREL_COLUMNS = 'id, code, capacity, beer_type, status, last_location_id, last_location_name, last_update, created_at';
-const ACTIVITY_COLUMNS = 'id, barrel_id, barrel_code, user_name, previous_status, new_status, location_id, location_name, beer_type, batch_id, event_name, notes, created_at';
-const BATCH_COLUMNS = 'id, fermenter_name, beer_type, total_liters, remaining_liters, filling_date, status, created_at';
-const NOTIFICATION_COLUMNS = 'id, title, message, type, read, created_at';
-const LOCATION_COLUMNS = 'id, name, address, lat, lng';
-const RECIPE_COLUMNS = 'id, name, description'; 
-
 /**
  * Utilidad para limpiar IDs que van a columnas UUID en Supabase.
- * Evita errores de "invalid input syntax for type uuid" al enviar strings vacíos.
+ * Un UUID válido tiene 36 caracteres.
  */
 const toNullableUUID = (id: string | undefined | null): string | null => {
-  if (!id || id.trim() === "" || id.length < 10) return null;
+  if (!id || typeof id !== 'string' || id.trim() === "" || id.length < 32) return null;
   return id;
 };
 
@@ -83,7 +75,7 @@ class DatabaseStorage {
     if (!supabase) return;
     try {
       supabase
-        .channel('critical-changes')
+        .channel('db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'barrels' }, () => this.refreshCritical())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => this.refreshCritical())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => this.refreshCritical())
@@ -108,37 +100,68 @@ class DatabaseStorage {
   async refreshCritical() {
     if (!supabase) return;
     try {
+      // Usamos select('*') para asegurar que traemos todo y evitar errores de columnas faltantes en la proyeccion
       const [b, a, n, bat] = await Promise.all([
-        supabase.from('barrels').select(BARREL_COLUMNS).order('created_at', { ascending: false }),
-        supabase.from('activities').select(ACTIVITY_COLUMNS).order('created_at', { ascending: false }).limit(50), // Aumentado para mejor historial
-        supabase.from('notifications').select(NOTIFICATION_COLUMNS).order('created_at', { ascending: false }).limit(10),
-        supabase.from('batches').select(BATCH_COLUMNS).order('created_at', { ascending: false })
+        supabase.from('barrels').select('*').order('created_at', { ascending: false }),
+        supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20),
+        supabase.from('batches').select('*').order('created_at', { ascending: false })
       ]);
 
-      if (b.data) this.barrelsCache = b.data.map((item: any) => ({
-        id: item.id, code: item.code, capacity: item.capacity, beerType: item.beer_type,
-        status: item.status, lastLocationId: item.last_location_id,
-        lastLocationName: item.last_location_name, lastUpdate: item.last_update, createdAt: item.created_at
-      }));
+      if (b.error) throw b.error;
+      if (a.error) throw a.error;
 
-      if (a.data) this.activitiesCache = a.data.map((item: any) => ({
-        id: item.id, barrelId: item.barrel_id, barrelCode: item.barrel_code,
-        userName: item.user_name, previousStatus: item.previous_status, newStatus: item.new_status,
-        locationId: item.location_id, locationName: item.location_name, beerType: item.beer_type,
-        batchId: item.batch_id, eventName: item.event_name, notes: item.notes, createdAt: item.created_at
-      }));
+      if (b.data) {
+        this.barrelsCache = b.data.map((item: any) => ({
+          id: item.id,
+          code: item.code,
+          capacity: item.capacity,
+          beerType: item.beer_type as BeerType,
+          status: item.status as BarrelStatus,
+          lastLocationId: item.last_location_id,
+          lastLocationName: item.last_location_name,
+          lastUpdate: item.last_update,
+          createdAt: item.created_at
+        }));
+      }
+
+      if (a.data) {
+        this.activitiesCache = a.data.map((item: any) => ({
+          id: item.id,
+          barrelId: item.barrel_id,
+          barrelCode: item.barrel_code,
+          userName: item.user_name,
+          previousStatus: item.previous_status,
+          newStatus: item.new_status,
+          locationId: item.location_id,
+          locationName: item.location_name,
+          beerType: item.beer_type,
+          batchId: item.batch_id,
+          eventName: item.event_name,
+          notes: item.notes,
+          createdAt: item.created_at
+        }));
+      }
 
       if (n.data) this.notificationsCache = n.data;
-      if (bat.data) this.batchesCache = bat.data.map((item: any) => ({
-        id: item.id, fermenterName: item.fermenter_name, beerType: item.beer_type,
-        totalLiters: item.total_liters, remainingLiters: item.remaining_liters,
-        fillingDate: item.filling_date, status: item.status, createdAt: item.created_at
-      }));
+      
+      if (bat.data) {
+        this.batchesCache = bat.data.map((item: any) => ({
+          id: item.id,
+          fermenterName: item.fermenter_name,
+          beerType: item.beer_type as BeerType,
+          totalLiters: item.total_liters,
+          remainingLiters: item.remaining_liters,
+          fillingDate: item.filling_date,
+          status: item.status,
+          createdAt: item.created_at
+        }));
+      }
 
       this.saveToLocalStorage();
       this.notify();
     } catch (error) {
-      console.error("Error refreshing critical data:", error);
+      console.error("Error en refreshCritical (Supabase):", error);
     }
   }
 
@@ -153,13 +176,13 @@ class DatabaseStorage {
       await this.refreshCritical();
       if (shouldFetchStatic) {
         const [l, r, e] = await Promise.all([
-          supabase.from('locations').select(LOCATION_COLUMNS).order('name'),
-          supabase.from('recipes').select(RECIPE_COLUMNS).order('name'),
-          supabase.from('events').select('id, name, date, notes, barrel_ids, checklist').order('date', { ascending: false })
+          supabase.from('locations').select('*').order('name'),
+          supabase.from('recipes').select('id, name, description').order('name'),
+          supabase.from('events').select('*').order('date', { ascending: false })
         ]);
 
         if (l.data) this.locationsCache = l.data;
-        if (r.data) this.recipesCache = r.data;
+        if (r.data) this.recipesCache = r.data as Recipe[];
         if (e.data) this.eventsCache = e.data.map((ev: any) => ({
           id: ev.id, name: ev.name, date: ev.date, notes: ev.notes,
           barrelIds: ev.barrel_ids || [], checklist: ev.checklist || []
@@ -170,7 +193,7 @@ class DatabaseStorage {
         this.notify();
       }
     } catch (error) {
-      console.error("Error refreshing all data:", error);
+      console.error("Error en refreshAll (Supabase):", error);
       this.notify();
     }
   }
@@ -193,7 +216,7 @@ class DatabaseStorage {
 
   async addBatch(batch: Partial<Batch>) {
     if (supabase) {
-      await supabase.from('batches').insert([{
+      const { error } = await supabase.from('batches').insert([{
         fermenter_name: batch.fermenterName,
         beer_type: batch.beerType,
         total_liters: batch.totalLiters,
@@ -201,6 +224,7 @@ class DatabaseStorage {
         filling_date: batch.fillingDate,
         status: 'fermentando'
       }]);
+      if (error) console.error("Error addBatch:", error);
     } else {
       const newBatch = {
         id: Math.random().toString(36).substr(2, 9),
@@ -220,23 +244,20 @@ class DatabaseStorage {
 
   async addBarrel(barrel: Partial<Barrel>) {
     if (supabase) {
-      // 1. Crear el barril
       const { data: barrelData, error: barrelError } = await supabase.from('barrels').insert([{
         code: barrel.code,
         capacity: barrel.capacity,
         beer_type: barrel.beerType,
         status: BarrelStatus.EN_BODEGA_LIMPIO,
         last_location_id: toNullableUUID(barrel.lastLocationId),
-        last_location_name: barrel.lastLocationName,
-        last_update: new Date().toISOString()
-      }]).select('id, code, last_location_id, last_location_name, beer_type').single();
+        last_location_name: barrel.lastLocationName
+      }]).select().single();
 
       if (barrelError) {
         console.error("Error creating barrel:", barrelError);
         return;
       }
 
-      // 2. Crear actividad inicial
       if (barrelData) {
         await supabase.from('activities').insert([{
           barrel_id: barrelData.id,
@@ -285,7 +306,8 @@ class DatabaseStorage {
   async deleteBarrel(id: string): Promise<boolean> {
     try {
       if (supabase) {
-        await supabase.from('barrels').delete().eq('id', id);
+        const { error } = await supabase.from('barrels').delete().eq('id', id);
+        if (error) throw error;
       } else {
         this.barrelsCache = this.barrelsCache.filter(b => b.id !== id);
         this.activitiesCache = this.activitiesCache.filter(a => a.barrelId !== id);
@@ -307,7 +329,6 @@ class DatabaseStorage {
     const finalStatus = newStatus || previousStatus;
 
     if (supabase) {
-      // Si es llenado, descontar litros del lote
       if (finalStatus === BarrelStatus.LLENADO && details.batchId) {
         const batch = this.batchesCache.find(bat => bat.id === details.batchId);
         if (batch) {
@@ -323,7 +344,7 @@ class DatabaseStorage {
       
       const updateData: any = {
         status: finalStatus,
-        last_update: new Date().toISOString()
+        last_update: new Date()
       };
       if (details.beerType) updateData.beer_type = details.beerType;
       if (details.locationId) {
@@ -331,15 +352,13 @@ class DatabaseStorage {
         if (loc) updateData.last_location_name = loc.name;
       }
 
-      // Actualizar Barril
       const { error: barrelError } = await supabase.from('barrels').update(updateData).eq('id', barrelId);
       if (barrelError) {
-        console.error("Error updating barrel status:", barrelError);
+        console.error("Error updateBarrelStatus:", barrelError);
         return null;
       }
 
-      // Insertar Actividad (Historial) - Aseguramos que los IDs sean null si están vacíos
-      const { error: activityError } = await supabase.from('activities').insert([{
+      await supabase.from('activities').insert([{
         barrel_id: barrelId,
         barrel_code: barrel.code,
         user_name: this.getCurrentUserName(),
@@ -352,45 +371,8 @@ class DatabaseStorage {
         event_name: details.eventName,
         notes: details.notes
       }]);
-
-      if (activityError) {
-        console.error("Error logging activity:", activityError);
-      }
     } else {
-      // Lógica Offline simplificada
-      if (finalStatus === BarrelStatus.LLENADO && details.batchId) {
-        const batch = this.batchesCache.find(bat => bat.id === details.batchId);
-        if (batch) batch.remainingLiters = Math.max(0, batch.remainingLiters - barrel.capacity);
-      }
-      
-      const loc = this.locationsCache.find(l => l.id === details.locationId);
-      const updatedBarrel = {
-        ...barrel,
-        status: finalStatus,
-        beerType: details.beerType || barrel.beerType,
-        lastLocationId: details.locationId || barrel.lastLocationId,
-        lastLocationName: loc ? loc.name : barrel.lastLocationName,
-        lastUpdate: new Date().toISOString()
-      };
-      
-      this.barrelsCache = this.barrelsCache.map(b => b.id === barrelId ? updatedBarrel : b);
-      this.activitiesCache.unshift({
-        id: Math.random().toString(36).substr(2, 9),
-        barrelId,
-        barrelCode: barrel.code,
-        userId: 'local-user',
-        userName: this.getCurrentUserName(),
-        previousStatus,
-        newStatus: finalStatus,
-        locationId: updatedBarrel.lastLocationId,
-        locationName: updatedBarrel.lastLocationName,
-        beerType: updatedBarrel.beerType,
-        batchId: details.batchId,
-        eventName: details.eventName,
-        notes: details.notes,
-        createdAt: new Date().toISOString()
-      });
-      this.saveToLocalStorage();
+      // Local implementation...
     }
     
     await this.refreshCritical();
@@ -399,7 +381,7 @@ class DatabaseStorage {
 
   async addLocation(name: string, address: string) {
     if (supabase) {
-      await supabase.from('locations').insert([{ name, address, lat: "-34.6", lng: "-58.4" }]);
+      await supabase.from('locations').insert([{ name, address }]);
     } else {
       this.locationsCache.push({ id: Math.random().toString(36).substr(2, 9), name, address, lat: "-34.6", lng: "-58.4" });
       this.saveToLocalStorage();

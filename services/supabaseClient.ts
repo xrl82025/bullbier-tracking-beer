@@ -4,7 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 // Intentamos obtener las variables de entorno de forma segura
 const getEnv = (key: string) => {
   try {
-    return process.env[key] || '';
+    // @ts-ignore
+    return (typeof process !== 'undefined' && process.env ? process.env[key] : '') || 
+           // @ts-ignore
+           (import.meta && import.meta.env ? import.meta.env[key] : '') || '';
   } catch {
     return '';
   }
@@ -21,5 +24,7 @@ export const supabase = isValid(supabaseUrl) && isValid(supabaseAnonKey)
   : null;
 
 if (!supabase) {
-  console.warn("Bullbier: Supabase no disponible. Iniciando motor de persistencia local (Offline Mode).");
+  console.warn("Bullbier: Supabase no detectado o credenciales inválidas. Usando LocalStorage.");
+} else {
+  console.log("Bullbier: Conectado exitosamente a Supabase.");
 }

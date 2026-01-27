@@ -11,6 +11,15 @@ const NOTIFICATION_COLUMNS = 'id, title, message, type, read, created_at';
 const LOCATION_COLUMNS = 'id, name, address, lat, lng';
 const RECIPE_COLUMNS = 'id, name, description'; 
 
+/**
+ * Utilidad para limpiar IDs que van a columnas UUID en Supabase.
+ * Evita errores de "invalid input syntax for type uuid" al enviar strings vacíos.
+ */
+const toNullableUUID = (id: string | undefined | null): string | null => {
+  if (!id || id.trim() === "" || id.length < 10) return null;
+  return id;
+};
+
 class DatabaseStorage {
   private listeners: (() => void)[] = [];
   private barrelsCache: Barrel[] = [];
@@ -101,7 +110,7 @@ class DatabaseStorage {
     try {
       const [b, a, n, bat] = await Promise.all([
         supabase.from('barrels').select(BARREL_COLUMNS).order('created_at', { ascending: false }),
-        supabase.from('activities').select(ACTIVITY_COLUMNS).order('created_at', { ascending: false }).limit(20),
+        supabase.from('activities').select(ACTIVITY_COLUMNS).order('created_at', { ascending: false }).limit(50), // Aumentado para mejor historial
         supabase.from('notifications').select(NOTIFICATION_COLUMNS).order('created_at', { ascending: false }).limit(10),
         supabase.from('batches').select(BATCH_COLUMNS).order('created_at', { ascending: false })
       ]);
@@ -180,7 +189,7 @@ class DatabaseStorage {
   getNotifications() { return this.notificationsCache; }
   getBatches() { return this.batchesCache; }
 
-  // --- MÉTODOS DE ESCRITURA (CREATE / UPDATE / DELETE) ---
+  // --- MÉTODOS DE ESCRITURA ---
 
   async addBatch(batch: Partial<Batch>) {
     if (supabase) {
@@ -191,7 +200,7 @@ class DatabaseStorage {
         remaining_liters: batch.totalLiters,
         filling_date: batch.fillingDate,
         status: 'fermentando'
-      }]).select('id');
+      }]);
     } else {
       const newBatch = {
         id: Math.random().toString(36).substr(2, 9),
@@ -211,15 +220,36 @@ class DatabaseStorage {
 
   async addBarrel(barrel: Partial<Barrel>) {
     if (supabase) {
-      await supabase.from('barrels').insert([{
+      // 1. Crear el barril
+      const { data: barrelData, error: barrelError } = await supabase.from('barrels').insert([{
         code: barrel.code,
         capacity: barrel.capacity,
         beer_type: barrel.beerType,
         status: BarrelStatus.EN_BODEGA_LIMPIO,
-        last_location_id: barrel.lastLocationId,
+        last_location_id: toNullableUUID(barrel.lastLocationId),
         last_location_name: barrel.lastLocationName,
         last_update: new Date().toISOString()
-      }]).select('id');
+      }]).select('id, code, last_location_id, last_location_name, beer_type').single();
+
+      if (barrelError) {
+        console.error("Error creating barrel:", barrelError);
+        return;
+      }
+
+      // 2. Crear actividad inicial
+      if (barrelData) {
+        await supabase.from('activities').insert([{
+          barrel_id: barrelData.id,
+          barrel_code: barrelData.code,
+          user_name: this.getCurrentUserName(),
+          previous_status: null,
+          new_status: BarrelStatus.EN_BODEGA_LIMPIO,
+          location_id: barrelData.last_location_id,
+          location_name: barrelData.last_location_name,
+          beer_type: barrelData.beer_type,
+          notes: 'Registro inicial del barril'
+        }]);
+      }
     } else {
       const newBarrel: Barrel = {
         id: Math.random().toString(36).substr(2, 9),
@@ -233,6 +263,20 @@ class DatabaseStorage {
         createdAt: new Date().toISOString()
       };
       this.barrelsCache.unshift(newBarrel);
+      this.activitiesCache.unshift({
+        id: Math.random().toString(36).substr(2, 9),
+        barrelId: newBarrel.id,
+        barrelCode: newBarrel.code,
+        userId: 'local-user',
+        userName: this.getCurrentUserName(),
+        previousStatus: null,
+        newStatus: BarrelStatus.EN_BODEGA_LIMPIO,
+        locationId: newBarrel.lastLocationId,
+        locationName: newBarrel.lastLocationName,
+        beerType: newBarrel.beerType,
+        notes: 'Registro inicial del barril',
+        createdAt: new Date().toISOString()
+      });
       this.saveToLocalStorage();
     }
     await this.refreshCritical();
@@ -275,35 +319,45 @@ class DatabaseStorage {
         }
       }
 
+      const loc = details.locationId ? this.locationsCache.find(l => l.id === details.locationId) : null;
+      
       const updateData: any = {
         status: finalStatus,
         last_update: new Date().toISOString()
       };
       if (details.beerType) updateData.beer_type = details.beerType;
       if (details.locationId) {
-        const loc = this.locationsCache.find(l => l.id === details.locationId);
-        if (loc) {
-          updateData.last_location_id = loc.id;
-          updateData.last_location_name = loc.name;
-        }
+        updateData.last_location_id = toNullableUUID(details.locationId);
+        if (loc) updateData.last_location_name = loc.name;
       }
 
-      await supabase.from('barrels').update(updateData).eq('id', barrelId).select('id');
-      await supabase.from('activities').insert([{
+      // Actualizar Barril
+      const { error: barrelError } = await supabase.from('barrels').update(updateData).eq('id', barrelId);
+      if (barrelError) {
+        console.error("Error updating barrel status:", barrelError);
+        return null;
+      }
+
+      // Insertar Actividad (Historial) - Aseguramos que los IDs sean null si están vacíos
+      const { error: activityError } = await supabase.from('activities').insert([{
         barrel_id: barrelId,
         barrel_code: barrel.code,
         user_name: this.getCurrentUserName(),
         previous_status: previousStatus,
         new_status: finalStatus,
-        location_id: updateData.last_location_id || barrel.lastLocationId,
+        location_id: toNullableUUID(updateData.last_location_id || barrel.lastLocationId),
         location_name: updateData.last_location_name || barrel.lastLocationName,
         beer_type: details.beerType || barrel.beerType,
-        batch_id: details.batchId,
+        batch_id: toNullableUUID(details.batchId),
         event_name: details.eventName,
         notes: details.notes
-      }]).select('id');
+      }]);
+
+      if (activityError) {
+        console.error("Error logging activity:", activityError);
+      }
     } else {
-      // Lógica Offline
+      // Lógica Offline simplificada
       if (finalStatus === BarrelStatus.LLENADO && details.batchId) {
         const batch = this.batchesCache.find(bat => bat.id === details.batchId);
         if (batch) batch.remainingLiters = Math.max(0, batch.remainingLiters - barrel.capacity);
@@ -345,7 +399,7 @@ class DatabaseStorage {
 
   async addLocation(name: string, address: string) {
     if (supabase) {
-      await supabase.from('locations').insert([{ name, address, lat: "-34.6", lng: "-58.4" }]).select('id');
+      await supabase.from('locations').insert([{ name, address, lat: "-34.6", lng: "-58.4" }]);
     } else {
       this.locationsCache.push({ id: Math.random().toString(36).substr(2, 9), name, address, lat: "-34.6", lng: "-58.4" });
       this.saveToLocalStorage();
@@ -355,7 +409,7 @@ class DatabaseStorage {
 
   async updateLocation(id: string, updates: Partial<Location>) {
     if (supabase) {
-      await supabase.from('locations').update(updates).eq('id', id).select('id');
+      await supabase.from('locations').update(updates).eq('id', id);
     } else {
       const idx = this.locationsCache.findIndex(l => l.id === id);
       if (idx !== -1) {
@@ -371,7 +425,8 @@ class DatabaseStorage {
     if (hasBarrels) return { success: false, error: "Ubicación con barriles activos." };
 
     if (supabase) {
-      await supabase.from('locations').delete().eq('id', id);
+      const { error } = await supabase.from('locations').delete().eq('id', id);
+      if (error) return { success: false, error: error.message };
     } else {
       this.locationsCache = this.locationsCache.filter(l => l.id !== id);
       this.saveToLocalStorage();
@@ -387,7 +442,7 @@ class DatabaseStorage {
         description: recipe.description,
         ingredients: recipe.ingredients,
         steps: recipe.steps
-      }]).select('id');
+      }]);
     } else {
       this.recipesCache.push({ id: Math.random().toString(36).substr(2, 9), ...recipe } as Recipe);
       this.saveToLocalStorage();
@@ -403,7 +458,7 @@ class DatabaseStorage {
         notes: event.notes,
         barrel_ids: event.barrelIds,
         checklist: event.checklist
-      }]).select('id');
+      }]);
     } else {
       this.eventsCache.push({ id: Math.random().toString(36).substr(2, 9), ...event } as BreweryEvent);
       this.saveToLocalStorage();
@@ -419,7 +474,7 @@ class DatabaseStorage {
       if (updates.notes) dbUpdates.notes = updates.notes;
       if (updates.barrelIds) dbUpdates.barrel_ids = updates.barrelIds;
       if (updates.checklist) dbUpdates.checklist = updates.checklist;
-      await supabase.from('events').update(dbUpdates).eq('id', id).select('id');
+      await supabase.from('events').update(dbUpdates).eq('id', id);
     } else {
       const idx = this.eventsCache.findIndex(e => e.id === id);
       if (idx !== -1) {
@@ -432,7 +487,7 @@ class DatabaseStorage {
 
   async markNotificationAsRead(id: string) {
     if (supabase) {
-      await supabase.from('notifications').update({ read: true }).eq('id', id).select('id');
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
     } else {
       const n = this.notificationsCache.find(not => not.id === id);
       if (n) n.read = true;
